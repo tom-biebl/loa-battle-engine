@@ -315,6 +315,15 @@ export class BattleEngine {
         const combat = game.combat;
         if (!combat) return;
 
+        // activeEffects VOR dem Clear sichern — sonst würden DoT/Status-Effekte
+        // beim Rundenwechsel gelöscht werden.
+        const preservedEffects = new Map<string, ActionResources["activeEffects"]>();
+        for (const [actorId, participant] of this.participants.entries()) {
+            if (participant.activeEffects?.length) {
+                preservedEffects.set(actorId, participant.activeEffects);
+            }
+        }
+
         this.participants.clear();
 
         for (const combatant of combat.combatants) {
@@ -323,7 +332,7 @@ export class BattleEngine {
                 hasAction: true,
                 hasBonusAction: true,
                 hasReaction: true,
-                activeEffects: [],
+                activeEffects: preservedEffects.get(combatant.actorId) ?? [],
             });
         }
 
