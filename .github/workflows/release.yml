@@ -36,10 +36,11 @@ jobs:
 
       - name: Build release zip
         run: |
-          zip -r loa-battle-engine-${{ env.VERSION }}.zip \
-            manifest.json \
-            dist/ \
-            templates/
+          mkdir loa-battle-engine
+          cp manifest.json loa-battle-engine/
+          cp -r dist templates loa-battle-engine/
+          zip -r loa-battle-engine-${{ env.VERSION }}.zip loa-battle-engine/
+          rm -rf loa-battle-engine
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
