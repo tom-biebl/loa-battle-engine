@@ -28,9 +28,9 @@ Hooks.once("ready", () => {
   // API für Makros zugänglich machen
   (game.modules?.get(MODULE_ID) as any).api = engine;
 
-  // Socket-Handler für Player-Actions (nur GM führt aus)
+  // Socket-Handler für Player-Actions (nur aktiver GM führt aus)
   game.socket?.on(`module.${MODULE_ID}`, async (data: any) => {
-    if (!game.user?.isGM) return;
+    if (game.user !== (game.users as any)?.activeGM) return;
 
     if (data.type === "useAction") {
       await engine._useAction(data.action);

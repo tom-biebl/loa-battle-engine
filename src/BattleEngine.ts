@@ -46,15 +46,27 @@ export class BattleEngine {
     // --- Public API ---
 
     public async useAction(action: Action): Promise<void> {
-        game.socket?.emit("module.loa-battle-engine", { type: "useAction", action });
+        if (game.user?.isGM) {
+            await this._useAction(action);
+        } else {
+            game.socket?.emit("module.loa-battle-engine", { type: "useAction", action });
+        }
     }
 
     public async useBonusAction(bonusAction: BonusAction): Promise<void> {
-        game.socket?.emit("module.loa-battle-engine", { type: "useBonusAction", bonusAction });
+        if (game.user?.isGM) {
+            await this._useBonusAction(bonusAction);
+        } else {
+            game.socket?.emit("module.loa-battle-engine", { type: "useBonusAction", bonusAction });
+        }
     }
 
     public async useReaction(reaction: Reaction): Promise<void> {
-        game.socket?.emit("module.loa-battle-engine", { type: "useReaction", reaction });
+        if (game.user?.isGM) {
+            await this._useReaction(reaction);
+        } else {
+            game.socket?.emit("module.loa-battle-engine", { type: "useReaction", reaction });
+        }
     }
 
     // --- Internal Methods (called by socket handlers) ---
