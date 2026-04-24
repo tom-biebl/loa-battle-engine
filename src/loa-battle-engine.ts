@@ -34,6 +34,12 @@ Hooks.on("createCombat", () => {
 });
 
 Hooks.on("updateCombat", (combat: Combat, changed: Record<string, unknown>) => {
-  if (!("round" in changed)) return;
-  engine.initParticipants();
+  if ("round" in changed) {
+    engine.initParticipants();
+    return;
+  }
+  // Flag-Änderung → alle Clients synchronisieren
+  if ((changed as any).flags?.["loa-battle-engine"]) {
+    engine.loadFromCombat();
+  }
 });
