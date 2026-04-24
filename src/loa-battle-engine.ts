@@ -41,7 +41,7 @@ Hooks.once("ready", () => {
       return;
     }
 
-    // Action-Dispatch — nur aktiver GM führt aus
+    // GM-pflichtige Operationen — nur aktiver GM führt aus
     if (game.user !== (game.users as any)?.activeGM) return;
 
     if (data.type === "useAction") {
@@ -50,6 +50,10 @@ Hooks.once("ready", () => {
       await engine._useBonusAction(data.bonusAction);
     } else if (data.type === "useReaction") {
       await engine._useReaction(data.reaction);
+    } else if (data.type === "pushTokenAwayFrom") {
+      await SpellManager._pushTokenAwayFromBy(data.tokenToMoveId, data.fromTokenId, data.distance);
+    } else if (data.type === "applyEffect") {
+      await SpellManager._applyEffect(data.targetTokenId, data.effectId);
     }
   });
 });

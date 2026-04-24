@@ -1,22 +1,18 @@
 .loa-reaction-proc {
     animation: loa-reaction-glow 1s ease-in-out infinite !important;
-    border: 2px solid #ffd700 !important;
-    position: relative;
-    z-index: 10;
+    position: relative !important;
+    z-index: 100 !important;
 }
 
 @keyframes loa-reaction-glow {
     0%, 100% {
-        box-shadow:
-            0 0 8px #ffd700,
-            0 0 16px #ffaa00,
-            inset 0 0 8px rgba(255, 215, 0, 0.4);
+        outline: 3px solid #ffd700;
+        outline-offset: 2px;
+        filter: drop-shadow(0 0 6px #ffd700) drop-shadow(0 0 12px #ffaa00);
     }
     50% {
-        box-shadow:
-            0 0 16px #ffd700,
-            0 0 32px #ffaa00,
-            0 0 48px #ff8800,
-            inset 0 0 16px rgba(255, 215, 0, 0.7);
+        outline: 4px solid #ff8800;
+        outline-offset: 5px;
+        filter: drop-shadow(0 0 14px #ffd700) drop-shadow(0 0 24px #ff8800);
     }
 }
