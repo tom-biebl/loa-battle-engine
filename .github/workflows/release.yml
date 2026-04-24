@@ -22,22 +22,23 @@ jobs:
 
       - run: npm run build
 
-      - name: Update manifest version
+      - name: Update module version
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          jq --arg version "$VERSION" '.version = $version' manifest.json > manifest.tmp.json
-          mv manifest.tmp.json manifest.json
+          jq --arg version "$VERSION" '.version = $version' module.json > module.tmp.json
+          mv module.tmp.json module.json
 
       - name: Build release zip
         run: |
-          zip -r loa-battle-engine.zip \
-            manifest.json \
-            dist/ \
+          zip -r module.zip \
+            module.json \
+            dist/loa-battle-engine.js \
+            dist/loa-battle-engine.css \
             templates/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            loa-battle-engine.zip
-            manifest.json
+            module.zip
+            module.json

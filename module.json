@@ -11,16 +11,19 @@
   "authors": [
     {
       "name": "tom-biebl",
+      "email": "tom.biebl@gmx.de",
       "url": "https://github.com/tom-biebl"
     }
   ],
-  "url": "https://github.com/tom-biebl/loa-battle-engine",
-  "manifest": "https://github.com/tom-biebl/loa-battle-engine/releases/latest/download/manifest.json",
-  "download": "https://github.com/tom-biebl/loa-battle-engine/releases/latest/download/loa-battle-engine.zip",
   "esmodules": [
     "dist/loa-battle-engine.js"
   ],
   "styles": [
     "dist/loa-battle-engine.css"
-  ]
+  ],
+  "url": "https://github.com/tom-biebl/loa-battle-engine",
+  "manifest": "https://github.com/tom-biebl/loa-battle-engine/releases/latest/download/module.json",
+  "download": "https://github.com/tom-biebl/loa-battle-engine/releases/latest/download/module.zip",
+  "bugs": "https://github.com/tom-biebl/loa-battle-engine/issues",
+  "license": "MIT"
 }
