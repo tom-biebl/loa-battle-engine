@@ -1,0 +1,48 @@
+{
+  "id": "loa-battle-engine",
+  "title": "LOA Battle Engine",
+  "description": "Stack-basiertes Action/Bonus Action/Reaction System inspiriert von Magic The Gathering mit GM-kontrollierter Auflösung.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "authors": [
+    {
+      "name": "tom-biebl",
+      "url": "https://github.com/tom-biebl"
+    }
+  ],
+  "url": "https://github.com/tom-biebl/loa-battle-engine",
+  "readme": "https://github.com/tom-biebl/loa-battle-engine/blob/main/README.md",
+  "bugs": "https://github.com/tom-biebl/loa-battle-engine/issues",
+  "changelog": "https://github.com/tom-biebl/loa-battle-engine/blob/main/CHANGELOG.md",
+  "license": "MIT",
+  "manifest": "https://github.com/tom-biebl/loa-battle-engine/releases/latest/download/manifest.json",
+  "download": "https://github.com/tom-biebl/loa-battle-engine/releases/download/v1.0.0/loa-battle-engine-1.0.0.zip",
+  "languages": [
+    {
+      "lang": "de",
+      "name": "Deutsch",
+      "path": "lang/de.json"
+    },
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "esmodules": [
+    "dist/loa-battle-engine.js"
+  ],
+  "styles": [
+    "dist/loa-battle-engine.css"
+  ],
+  "scripts": [],
+  "packs": [],
+  "socket": true,
+  "flags": {
+    "allowBBCode": true
+  }
+}

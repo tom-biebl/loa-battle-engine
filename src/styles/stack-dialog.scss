@@ -1,0 +1,103 @@
+.loa-stack-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+
+  .stack-table-wrapper {
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+  }
+
+  .stack-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    thead tr {
+      background: #1e1e1e;
+
+      th {
+        padding: 8px 10px;
+        text-align: left;
+        color: #aaa;
+        font-weight: 500;
+        border-bottom: 1px solid #3a3a3a;
+      }
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #2a2a2a;
+      transition: background 0.15s;
+
+      &:last-child { border-bottom: none; }
+      &:hover { background: rgba(255, 255, 255, 0.04); }
+    }
+
+    td {
+      padding: 8px 10px;
+      color: #ddd;
+    }
+  }
+
+  .stack-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    &--action       { background: #1a3a5c; color: #6ab0f5; }
+    &--bonus-action { background: #1a3d2b; color: #5ed490; }
+    &--reaction     { background: #3d2a1a; color: #f5a05a; }
+  }
+
+  .stack-item__delete {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover {
+      color: #e05c5c;
+      background: rgba(224, 92, 92, 0.1);
+    }
+  }
+
+  .stack-empty {
+    text-align: center;
+    color: #555;
+    padding: 24px;
+    font-style: italic;
+  }
+
+  .stack-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+
+    button {
+      padding: 7px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: filter 0.15s;
+
+      &:hover { filter: brightness(1.15); }
+    }
+
+    .btn-resolve { background: #1a4a2a; color: #5ed490; }
+    .btn-cancel  { background: #3d1a1a; color: #e05c5c; }
+  }
+}

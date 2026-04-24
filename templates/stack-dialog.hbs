@@ -1,0 +1,36 @@
+<div class="loa-stack-dialog">
+  <div class="stack-table-wrapper">
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>Typ</th>
+          <th>Actor</th>
+          <th>Ziel</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each stack}}
+        <tr class="stack-row stack-row--{{this.kind}}">
+          <td><span class="stack-badge stack-badge--{{this.kind}}">{{this.kindLabel}}</span></td>
+          <td>{{this.actorId}}</td>
+          <td>{{or this.targetId "—"}}</td>
+          <td>
+            <button class="stack-item__delete" data-index="{{this.index}}" title="Entfernen">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="4" class="stack-empty">Stack ist leer.</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  <div class="stack-footer">
+    <button class="btn-resolve"><i class="fas fa-play"></i> Resolve Stack</button>
+    <button class="btn-cancel"><i class="fas fa-times"></i> GM Cancel</button>
+  </div>
+</div>
