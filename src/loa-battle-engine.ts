@@ -2,7 +2,10 @@ import { BattleEngine } from "./BattleEngine";
 import { DialogManager } from "./managers/DialogManager";
 import { RollManager } from "./managers/RollManager";
 import { ActorManager } from "./managers/ActorManager";
+import { SpellManager } from "./managers/SpellManager";
 import { StackDialog } from "./dialogs/StackDialog";
+import { procReactionMacros } from "./utils/ReactionProc";
+import "./styles/reaction-proc.scss";
 
 const MODULE_ID = "loa-battle-engine";
 
@@ -26,10 +29,19 @@ Hooks.once("ready", () => {
   engine.loadFromCombat();
 
   // API für Makros zugänglich machen
-  (game.modules?.get(MODULE_ID) as any).api = engine;
+  const mod = game.modules?.get(MODULE_ID) as any;
+  mod.api = engine;
+  mod.spells = SpellManager;
 
-  // Socket-Handler für Player-Actions (nur aktiver GM führt aus)
+  // Socket-Handler
   game.socket?.on(`module.${MODULE_ID}`, async (data: any) => {
+    // Reaction-Proc auf allen Clients animieren
+    if (data.type === "procReactions") {
+      procReactionMacros();
+      return;
+    }
+
+    // Action-Dispatch — nur aktiver GM führt aus
     if (game.user !== (game.users as any)?.activeGM) return;
 
     if (data.type === "useAction") {

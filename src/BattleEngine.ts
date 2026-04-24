@@ -6,6 +6,7 @@ import { RollManager } from "./managers/RollManager";
 import { Notifications } from "./utils/Notifications";
 import { ActorManager } from "./managers/ActorManager";
 import { ChatManager } from "./managers/ChatManager";
+import { procReactionMacros } from "./utils/ReactionProc";
 
 const MODULE_ID = "loa-battle-engine";
 const STACK_FLAG_KEY = "stack";
@@ -392,6 +393,15 @@ export class BattleEngine {
     private pushItemToStack(item: StackItem): void {
         this.stack.push(item);
         this.persistStack();
+        if (item.kind === "action" || item.kind === "bonus-action") {
+            this.procReactions();
+        }
+    }
+
+    // Triggert die Glow-Animation auf [R]-Makros in der Hotbar bei allen Clients
+    private procReactions(): void {
+        game.socket?.emit("module.loa-battle-engine", { type: "procReactions" });
+        procReactionMacros();
     }
 
     private async persistStack(): Promise<void> {

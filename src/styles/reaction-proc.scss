@@ -1,0 +1,22 @@
+.loa-reaction-proc {
+    animation: loa-reaction-glow 1s ease-in-out infinite !important;
+    border: 2px solid #ffd700 !important;
+    position: relative;
+    z-index: 10;
+}
+
+@keyframes loa-reaction-glow {
+    0%, 100% {
+        box-shadow:
+            0 0 8px #ffd700,
+            0 0 16px #ffaa00,
+            inset 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+    50% {
+        box-shadow:
+            0 0 16px #ffd700,
+            0 0 32px #ffaa00,
+            0 0 48px #ff8800,
+            inset 0 0 16px rgba(255, 215, 0, 0.7);
+    }
+}
