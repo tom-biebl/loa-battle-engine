@@ -67,6 +67,10 @@ Hooks.on("updateCombat", (combat: Combat, changed: Record<string, unknown>) => {
     engine.initParticipants();
     return;
   }
+  // Turn-Wechsel → Effekte des neuen aktiven Combatants ticken
+  if ("turn" in changed) {
+    engine.tickActiveEffects();
+  }
   // Flag-Änderung → alle Clients synchronisieren
   if ((changed as any).flags?.["loa-battle-engine"]) {
     engine.loadFromCombat();

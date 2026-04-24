@@ -17,6 +17,29 @@ export type SavingThrow = {
     modifier: AttributeKey;
 };
 
+// --- Spell Effects ---
+
+export type DotEffectType = "poison" | "burning" | "bleeding";
+export type StatusEffectType = "stunned" | "slowed" | "prone";
+
+export type DotEffect = {
+    effectType: DotEffectType;
+    effectDuration: number;
+    damageFormulaPerRound: string;
+    damageType: DamageType;
+    effectIconId: string;
+    name: string;
+};
+
+export type StatusEffect = {
+    effectType: StatusEffectType;
+    effectDuration: number;
+    effectIconId: string;
+    name: string;
+};
+
+export type SpellEffect = DotEffect | StatusEffect;
+
 // Schaden der noch gewürfelt werden muss
 export type RollableDamageFrame = {
     damageFormula: string;
@@ -43,6 +66,8 @@ type StackItemBase = {
     stackIndex: number;
     status: "pending" | "resolved" | "countered";
     savingThrow?: SavingThrow;
+    // Optional: an einen Spell angehängter Effekt (Gift, Brand, etc.)
+    spellEffect?: SpellEffect;
 };
 
 // --- Action ---
@@ -146,4 +171,16 @@ type TriggerFixedReaction = StackItemBase & {
 
 export type Reaction = CounterReaction | InterruptReaction | TriggerRollReaction | TriggerFixedReaction;
 
-export type StackItem = Action | BonusAction | Reaction;
+// --- Effect Stack Items ---
+
+type EffectApply = StackItemBase & {
+    kind: "effect-apply";
+    effect: SpellEffect;
+};
+
+type EffectTick = StackItemBase & {
+    kind: "effect-tick";
+    effect: SpellEffect;
+};
+
+export type StackItem = Action | BonusAction | Reaction | EffectApply | EffectTick;

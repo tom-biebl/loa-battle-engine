@@ -1,4 +1,4 @@
-import { Action, AttributeKey, BonusAction, DamageType } from "../models/StackItem";
+import { Action, AttributeKey, BonusAction, DamageType, SpellEffect } from "../models/StackItem";
 import { BattleEngine } from "../BattleEngine";
 import { Notifications } from "../utils/Notifications";
 
@@ -12,6 +12,7 @@ type MeleeOptions = {
     acModifier?: AttributeKey;
     damageType?: DamageType;
     kind?: AttackKind;
+    spellEffect?: SpellEffect;
 };
 
 type RangedOptions = {
@@ -20,6 +21,7 @@ type RangedOptions = {
     acModifier?: AttributeKey;
     damageType?: DamageType;
     kind?: AttackKind;
+    spellEffect?: SpellEffect;
 };
 
 type TargetSpellOptions = {
@@ -28,6 +30,7 @@ type TargetSpellOptions = {
     acModifier: AttributeKey;
     damageType: DamageType;
     kind?: AttackKind;
+    spellEffect?: SpellEffect;
 };
 
 type Context = {
@@ -72,6 +75,7 @@ export class SpellManager {
         damageType: DamageType,
         acModifier: AttributeKey,
         kind: AttackKind,
+        spellEffect?: SpellEffect,
     ): Action | BonusAction {
         return {
             id: foundry.utils.randomID(),
@@ -85,6 +89,7 @@ export class SpellManager {
             damageFrame: { damageFormula, damageType },
             stackIndex: Date.now(),
             status: "pending",
+            spellEffect,
         } as Action | BonusAction;
     }
 
@@ -108,6 +113,7 @@ export class SpellManager {
             opts.damageType ?? "physical",
             opts.acModifier ?? "str",
             opts.kind ?? "action",
+            opts.spellEffect,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -124,6 +130,7 @@ export class SpellManager {
             opts.damageType ?? "physical",
             opts.acModifier ?? "dex",
             opts.kind ?? "action",
+            opts.spellEffect,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -140,6 +147,7 @@ export class SpellManager {
             opts.damageType,
             opts.acModifier,
             opts.kind ?? "action",
+            opts.spellEffect,
         );
         await this.dispatch(item, ctx.engine);
     }

@@ -112,6 +112,7 @@ export class BattleEngine {
         }
 
         this.pushItemToStack(action);
+        this.maybePushEffectApply(action);
         this.dialogManager.open("stack");
     }
 
@@ -155,6 +156,7 @@ export class BattleEngine {
         }
 
         this.pushItemToStack(bonusAction);
+        this.maybePushEffectApply(bonusAction);
         this.dialogManager.refresh("stack");
     }
 
@@ -194,6 +196,7 @@ export class BattleEngine {
         }
 
         this.pushItemToStack(reaction);
+        this.maybePushEffectApply(reaction);
         this.dialogManager.refresh("stack");
     }
 
@@ -267,6 +270,14 @@ export class BattleEngine {
                         break;
                 }
                 break;
+
+            case "effect-apply":
+                await this.resolveEffectApply(item);
+                break;
+
+            case "effect-tick":
+                await this.resolveEffectTick(item);
+                break;
         }
     }
 
@@ -312,6 +323,7 @@ export class BattleEngine {
                 hasAction: true,
                 hasBonusAction: true,
                 hasReaction: true,
+                activeEffects: [],
             });
         }
 
@@ -393,9 +405,127 @@ export class BattleEngine {
     private pushItemToStack(item: StackItem): void {
         this.stack.push(item);
         this.persistStack();
-        if (item.kind === "action" || item.kind === "bonus-action") {
+        // Alle Nicht-Reaktionen proccen die [R]-Makros (Aktionen, BonusAktionen, Effekte)
+        if (item.kind !== "reaction") {
             this.procReactions();
         }
+    }
+
+    // Wenn ein Action/BonusAction/Reaction einen SpellEffect angehängt hat,
+    // wird ein effect-apply Item mit niedrigerem stackIndex gepusht (resolve NACH dem Parent).
+    private maybePushEffectApply(parent: Action | BonusAction | Reaction): void {
+        if (!parent.spellEffect || !parent.targetTokenId) return;
+        const targetActor = canvas?.tokens?.get(parent.targetTokenId)?.actor;
+        this.pushItemToStack({
+            id: foundry.utils.randomID(),
+            name: `${parent.spellEffect.name} (Apply)`,
+            tokenId: parent.tokenId,
+            actorId: parent.actorId,
+            targetTokenId: parent.targetTokenId,
+            targetActorId: targetActor?.id,
+            kind: "effect-apply",
+            effect: parent.spellEffect,
+            stackIndex: parent.stackIndex - 1,
+            status: "pending",
+        } as StackItem);
+    }
+
+    // Wird bei Turn-Wechsel aufgerufen — pusht effect-tick pro aktiver Wirkung für den aktiven Combatant
+    public tickActiveEffects(): void {
+        if (game.user !== (game.users as any)?.activeGM) return;
+        const combat = game.combat;
+        if (!combat) return;
+
+        const combatant = (combat as any).combatant;
+        const actorId = combatant?.actorId;
+        const tokenId = combatant?.token?.id ?? combatant?.tokenId;
+        if (!actorId || !tokenId) return;
+
+        const participant = this.participants.get(actorId);
+        if (!participant?.activeEffects?.length) return;
+
+        let hasPushed = false;
+        for (const effect of participant.activeEffects) {
+            this.pushItemToStack({
+                id: foundry.utils.randomID(),
+                name: `${effect.name} (Tick)`,
+                tokenId,
+                actorId,
+                targetTokenId: tokenId,
+                targetActorId: actorId,
+                kind: "effect-tick",
+                effect: { ...effect },
+                stackIndex: Date.now(),
+                status: "pending",
+            } as StackItem);
+            hasPushed = true;
+        }
+
+        if (hasPushed) this.dialogManager.open("stack");
+    }
+
+    private async resolveEffectApply(item: Extract<StackItem, { kind: "effect-apply" }>): Promise<void> {
+        if (!item.targetTokenId) return;
+        const targetActor = canvas?.tokens?.get(item.targetTokenId)?.actor;
+        if (!targetActor) return;
+        const participant = this.participants.get(targetActor.id as string);
+        if (!participant) return;
+
+        if (!participant.activeEffects) participant.activeEffects = [];
+
+        // Stacking: gleicher effectType → Duration aufaddieren, sonst neu hinzufügen
+        const existing = participant.activeEffects.find(e => e.effectType === item.effect.effectType);
+        if (existing) {
+            existing.effectDuration += item.effect.effectDuration;
+        } else {
+            participant.activeEffects.push({ ...item.effect });
+        }
+
+        // Icon am Token setzen
+        await (targetActor as any).toggleStatusEffect(item.effect.effectIconId, { active: true });
+
+        // Apply zählt als Tick 1 → wenn DoT, direkt Damage + Duration dekrementieren
+        if ("damageFormulaPerRound" in item.effect) {
+            await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, {
+                damageFormula: item.effect.damageFormulaPerRound,
+                damageType: item.effect.damageType,
+            }, item.effect.name);
+        }
+
+        const stored = participant.activeEffects.find(e => e.effectType === item.effect.effectType);
+        if (stored) {
+            stored.effectDuration -= 1;
+            if (stored.effectDuration <= 0) {
+                participant.activeEffects = participant.activeEffects.filter(e => e.effectType !== item.effect.effectType);
+                await (targetActor as any).toggleStatusEffect(item.effect.effectIconId, { active: false });
+            }
+        }
+        this.persistParticipants();
+    }
+
+    private async resolveEffectTick(item: Extract<StackItem, { kind: "effect-tick" }>): Promise<void> {
+        if (!item.targetTokenId) return;
+        const targetActor = canvas?.tokens?.get(item.targetTokenId)?.actor;
+        if (!targetActor) return;
+        const participant = this.participants.get(targetActor.id as string);
+        if (!participant?.activeEffects) return;
+
+        const effect = participant.activeEffects.find(e => e.effectType === item.effect.effectType);
+        if (!effect) return;
+
+        if ("damageFormulaPerRound" in effect) {
+            await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, {
+                damageFormula: effect.damageFormulaPerRound,
+                damageType: effect.damageType,
+            }, effect.name);
+        }
+
+        effect.effectDuration -= 1;
+        if (effect.effectDuration <= 0) {
+            participant.activeEffects = participant.activeEffects.filter(e => e.effectType !== effect.effectType);
+            await (targetActor as any).toggleStatusEffect(effect.effectIconId, { active: false });
+        }
+        this.persistParticipants();
     }
 
     // Triggert die Glow-Animation auf [R]-Makros in der Hotbar bei allen Clients
