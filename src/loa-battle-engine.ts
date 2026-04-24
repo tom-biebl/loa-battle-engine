@@ -27,6 +27,19 @@ Hooks.once("ready", () => {
 
   // API für Makros zugänglich machen
   (game.modules?.get(MODULE_ID) as any).api = engine;
+
+  // Socket-Handler für Player-Actions (nur GM führt aus)
+  game.socket?.on(`module.${MODULE_ID}`, async (data: any) => {
+    if (!game.user?.isGM) return;
+
+    if (data.type === "useAction") {
+      await engine._useAction(data.action);
+    } else if (data.type === "useBonusAction") {
+      await engine._useBonusAction(data.bonusAction);
+    } else if (data.type === "useReaction") {
+      await engine._useReaction(data.reaction);
+    }
+  });
 });
 
 Hooks.on("createCombat", () => {

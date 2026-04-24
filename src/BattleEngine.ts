@@ -46,6 +46,20 @@ export class BattleEngine {
     // --- Public API ---
 
     public async useAction(action: Action): Promise<void> {
+        game.socket?.emit("module.loa-battle-engine", { type: "useAction", action });
+    }
+
+    public async useBonusAction(bonusAction: BonusAction): Promise<void> {
+        game.socket?.emit("module.loa-battle-engine", { type: "useBonusAction", bonusAction });
+    }
+
+    public async useReaction(reaction: Reaction): Promise<void> {
+        game.socket?.emit("module.loa-battle-engine", { type: "useReaction", reaction });
+    }
+
+    // --- Internal Methods (called by socket handlers) ---
+
+    public async _useAction(action: Action): Promise<void> {
         if (!game.combat) return;
 
         const participant = this.getParticipant(action.actorId);
@@ -88,7 +102,7 @@ export class BattleEngine {
         this.dialogManager.open("stack");
     }
 
-    public async useBonusAction(bonusAction: BonusAction): Promise<void> {
+    public async _useBonusAction(bonusAction: BonusAction): Promise<void> {
         if (!game.combat) return;
 
         const participant = this.getParticipant(bonusAction.actorId);
@@ -131,7 +145,7 @@ export class BattleEngine {
         this.dialogManager.refresh("stack");
     }
 
-    public async useReaction(reaction: Reaction): Promise<void> {
+    public async _useReaction(reaction: Reaction): Promise<void> {
         if (!game.combat) return;
 
         const participant = this.getParticipant(reaction.actorId);
