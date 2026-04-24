@@ -34,11 +34,19 @@ export class StackDialog extends Application {
 
   override getData(): object {
     return {
-      stack: this.engine.getStack().map((item, index) => ({
-        ...item,
-        index,
-        kindLabel: KIND_LABELS[item.kind] ?? item.kind,
-      })),
+      stack: this.engine.getStack().map((item, index) => {
+        const actorName = game.actors?.get(item.actorId)?.name ?? "?";
+        const targetName = item.targetTokenId
+          ? canvas?.tokens?.get(item.targetTokenId)?.name ?? "?"
+          : null;
+        return {
+          ...item,
+          index,
+          kindLabel: KIND_LABELS[item.kind] ?? item.kind,
+          actorDisplay: `${actorName} (${item.actorId})`,
+          targetDisplay: targetName ? `${targetName} (${item.targetTokenId})` : "—",
+        };
+      }),
     };
   }
 

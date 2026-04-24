@@ -13,8 +13,8 @@
         {{#each stack}}
         <tr class="stack-row stack-row--{{this.kind}}">
           <td><span class="stack-badge stack-badge--{{this.kind}}">{{this.kindLabel}}</span></td>
-          <td>{{this.actorId}}</td>
-          <td>{{or this.targetId "—"}}</td>
+          <td>{{this.actorDisplay}}</td>
+          <td>{{this.targetDisplay}}</td>
           <td>
             <button class="stack-item__delete" data-index="{{this.index}}" title="Entfernen">
               <i class="fas fa-trash-alt"></i>
