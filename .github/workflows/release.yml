@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Update manifest version and download URL
+        run: |
+          jq \
+            --arg version "$VERSION" \
+            --arg tag "$GITHUB_REF_NAME" \
+            '.version = $version | .download = "https://github.com/tom-biebl/loa-battle-engine/releases/download/\($tag)/loa-battle-engine-\($version).zip"' \
+            manifest.json > manifest.tmp.json
+          mv manifest.tmp.json manifest.json
+
+      - name: Build release zip
+        run: |
+          zip -r loa-battle-engine-${{ env.VERSION }}.zip \
+            manifest.json \
+            dist/ \
+            templates/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            loa-battle-engine-${{ env.VERSION }}.zip
+            manifest.json
