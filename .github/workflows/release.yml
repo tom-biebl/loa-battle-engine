@@ -22,29 +22,22 @@ jobs:
 
       - run: npm run build
 
-      - name: Extract version from tag
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-
-      - name: Update manifest version and download URL
+      - name: Update manifest version
         run: |
-          jq \
-            --arg version "$VERSION" \
-            --arg tag "$GITHUB_REF_NAME" \
-            '.version = $version | .download = "https://github.com/tom-biebl/loa-battle-engine/releases/download/\($tag)/loa-battle-engine-\($version).zip"' \
-            manifest.json > manifest.tmp.json
+          VERSION=${GITHUB_REF_NAME#v}
+          jq --arg version "$VERSION" '.version = $version' manifest.json > manifest.tmp.json
           mv manifest.tmp.json manifest.json
 
       - name: Build release zip
         run: |
-          mkdir loa-battle-engine
-          cp manifest.json loa-battle-engine/
-          cp -r dist templates loa-battle-engine/
-          zip -r loa-battle-engine-${{ env.VERSION }}.zip loa-battle-engine/
-          rm -rf loa-battle-engine
+          zip -r loa-battle-engine.zip \
+            manifest.json \
+            dist/ \
+            templates/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            loa-battle-engine-${{ env.VERSION }}.zip
+            loa-battle-engine.zip
             manifest.json
