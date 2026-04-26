@@ -72,6 +72,11 @@ export class ActorManager {
         return actor ? extractProps(actor)?.[`${attr}_malus_attr`] : undefined;
     }
 
+    // Heilung — addiert amount auf pc_hp. Kein Max-Clamp (System soll selbst kappen).
+    async applyHealing(tokenId: string, amount: number): Promise<void> {
+        await this.modifyProp(tokenId, "pc_hp", amount);
+    }
+
     async applyDamage(tokenId: string, amount: number): Promise<void> {
         const actor = getActorByToken(tokenId);
         if (!actor) return;

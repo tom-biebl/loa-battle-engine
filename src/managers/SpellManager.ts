@@ -209,6 +209,141 @@ export class SpellManager {
         await this.dispatch(item, ctx.engine);
     }
 
+    // Heilzauber — heilt das Target um healingFormula HP (immer, kein AC-Wurf).
+    static async castHealSpell(opts: {
+        name: string;
+        healingFormula: string;
+        kind?: AttackKind;
+        spellEffect?: SpellEffect;
+        animations?: SpellAnimations;
+        pushSelf?: PushOpt;
+        pushTarget?: PushOpt;
+        resourceCosts?: ResourceCost[];
+    }): Promise<void> {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        if (!ctx.targetTokenId) {
+            Notifications.error("Kein Heilziel — Token targeten!");
+            return;
+        }
+
+        const item = {
+            id: foundry.utils.randomID(),
+            kind: opts.kind ?? "action",
+            subtype: "heal",
+            name: opts.name,
+            tokenId: ctx.tokenId,
+            actorId: ctx.actorId,
+            targetTokenId: ctx.targetTokenId,
+            healingFormula: opts.healingFormula,
+            stackIndex: Date.now(),
+            status: "pending",
+            spellEffect: opts.spellEffect,
+            animations: opts.animations,
+            pushSelf: opts.pushSelf,
+            pushTarget: opts.pushTarget,
+            resourceCosts: opts.resourceCosts,
+        } as Action | BonusAction;
+
+        if (item.kind === "bonus-action") await ctx.engine.useBonusAction(item as BonusAction);
+        else await ctx.engine.useAction(item as Action);
+    }
+
+    // Reaktion auf das oberste Stack-Item (LIFO). Subtype bestimmt das Verhalten:
+    // - counter / interrupt: kein Damage, cancelt/unterbricht das Trigger-Item
+    // - trigger-roll: AC-Wurf gegen Trigger-Source, Damage bei Hit
+    // - trigger-fixed: kein AC-Wurf, Damage immer
+    static async useReaction(opts: {
+        name: string;
+        subtype: "counter" | "interrupt" | "trigger-roll" | "trigger-fixed";
+        damageFormula?: string;
+        damageType?: DamageType;
+        acModifier?: AttributeKey;
+        spellEffect?: SpellEffect;
+        animations?: SpellAnimations;
+        pushSelf?: PushOpt;
+        pushTarget?: PushOpt;
+        resourceCosts?: ResourceCost[];
+    }): Promise<void> {
+        const ctx = this.getContext();
+        if (!ctx) return;
+
+        const stack = ctx.engine.getStack();
+        const trigger = stack[stack.length - 1];
+        if (!trigger) {
+            Notifications.error("Kein Item auf dem Stack zum Reagieren!");
+            return;
+        }
+
+        const base: any = {
+            id: foundry.utils.randomID(),
+            kind: "reaction",
+            subtype: opts.subtype,
+            name: opts.name,
+            tokenId: ctx.tokenId,
+            actorId: ctx.actorId,
+            targetTokenId: trigger.tokenId,
+            triggerItemId: trigger.id,
+            stackIndex: Date.now(),
+            status: "pending",
+            spellEffect: opts.spellEffect,
+            animations: opts.animations,
+            pushSelf: opts.pushSelf,
+            pushTarget: opts.pushTarget,
+            resourceCosts: opts.resourceCosts,
+        };
+
+        if (opts.subtype === "trigger-roll" || opts.subtype === "trigger-fixed") {
+            base.acModifier = opts.acModifier ?? "str";
+            base.damageFrame = {
+                damageFormula: opts.damageFormula ?? "1d4",
+                damageType: opts.damageType ?? "physical",
+            };
+        }
+
+        await ctx.engine.useReaction(base);
+    }
+
+    // Utility-Aktion — kein Damage, optional mit DC-Wurf.
+    static async useUtility(opts: {
+        name: string;
+        kind?: AttackKind;
+        hasToBeRolled?: boolean;
+        dc?: number;
+        acModifier?: AttributeKey;
+        spellEffect?: SpellEffect;
+        animations?: SpellAnimations;
+        pushSelf?: PushOpt;
+        pushTarget?: PushOpt;
+        resourceCosts?: ResourceCost[];
+    }): Promise<void> {
+        const ctx = this.getContext();
+        if (!ctx) return;
+
+        const item = {
+            id: foundry.utils.randomID(),
+            kind: opts.kind ?? "action",
+            subtype: "utility",
+            name: opts.name,
+            tokenId: ctx.tokenId,
+            actorId: ctx.actorId,
+            targetTokenId: ctx.targetTokenId,
+            acModifier: opts.acModifier ?? "wis",
+            dc: opts.dc ?? 10,
+            hasToBeRolled: opts.hasToBeRolled ?? false,
+            stackIndex: Date.now(),
+            status: "pending",
+            spellEffect: opts.spellEffect,
+            animations: opts.animations,
+            pushSelf: opts.pushSelf,
+            pushTarget: opts.pushTarget,
+            resourceCosts: opts.resourceCosts,
+        } as Action | BonusAction;
+
+        if (item.kind === "bonus-action") await ctx.engine.useBonusAction(item as BonusAction);
+        else await ctx.engine.useAction(item as Action);
+    }
+
     // Konzentrations-Aktion — würfelt diceFormula und baut entsprechend RP ab.
     // Würfel wird im SpellManager (Player-Side) gerollt, das Ergebnis als fixer Cost an _useAction übergeben.
     static async useConcentration(opts: { name: string; diceFormula: string; kind?: AttackKind }): Promise<void> {

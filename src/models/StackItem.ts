@@ -163,7 +163,14 @@ type DamageAOEAction = StackItemBase & {
     consumes?: Item;
 };
 
-export type Action = DamageRollAction | DamageFixedAction | UtilityAction | DamageAOEAction;
+type HealAction = StackItemBase & {
+    kind: "action";
+    subtype: "heal";
+    healingFormula: string; // wird auf Resolve gewürfelt
+    consumes?: Item;
+};
+
+export type Action = DamageRollAction | DamageFixedAction | UtilityAction | DamageAOEAction | HealAction;
 
 // --- BonusAction ---
 
@@ -198,7 +205,14 @@ type MovementBonusAction = StackItemBase & {
     destination?: { x: number; y: number };
 };
 
-export type BonusAction = DamageRollBonusAction | DamageFixedBonusAction | UtilityBonusAction | MovementBonusAction;
+type HealBonusAction = StackItemBase & {
+    kind: "bonus-action";
+    subtype: "heal";
+    healingFormula: string;
+    consumes?: Item;
+};
+
+export type BonusAction = DamageRollBonusAction | DamageFixedBonusAction | UtilityBonusAction | MovementBonusAction | HealBonusAction;
 
 // --- Reaction ---
 

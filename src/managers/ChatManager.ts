@@ -29,6 +29,12 @@ export class ChatManager {
         );
     }
 
+    static async healing(actionName: string, amount: number, target: string): Promise<void> {
+        await ChatManager.send(
+            `<strong style="color:#3a3">✚</strong> <strong>${actionName}</strong> heilt <strong>${target}</strong> für <strong>${amount} HP</strong>`
+        );
+    }
+
     static async countered(actionName: string): Promise<void> {
         await ChatManager.send(
             `<strong>${actionName}</strong> wurde <strong>gecountert</strong>.`

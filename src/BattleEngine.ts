@@ -125,6 +125,13 @@ export class BattleEngine {
                 }
                 break;
             }
+            case "heal": {
+                if (!action.targetTokenId) {
+                    Notifications.error("Kein Heilziel selektiert!");
+                    return;
+                }
+                break;
+            }
             default:
                 console.error("Unbekannter action.subtype.");
                 return;
@@ -173,6 +180,13 @@ export class BattleEngine {
             }
             case "movement":
                 break;
+            case "heal": {
+                if (!bonusAction.targetTokenId) {
+                    Notifications.error("Kein Heilziel selektiert!");
+                    return;
+                }
+                break;
+            }
             default:
                 console.error("Unbekannter bonusAction.subtype.");
                 return;
@@ -289,6 +303,14 @@ export class BattleEngine {
                     }
                 } else if (item.kind === "action" && item.subtype === "damage-aoe") {
                     await this.resolveAOE(item);
+                } else if (item.subtype === "heal") {
+                    if (!item.targetTokenId) return;
+                    if (item.animations) {
+                        await SequencerManager.playSpellSequence(item.tokenId, item.targetTokenId, item.animations);
+                    }
+                    const amount = await this.rollManager.roll(item.healingFormula, item.tokenId);
+                    await this.actorManager.applyHealing(item.targetTokenId, amount);
+                    await ChatManager.healing(item.name, amount, this.getTokenName(item.targetTokenId));
                 }
                 break;
 
