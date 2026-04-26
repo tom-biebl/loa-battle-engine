@@ -17,6 +17,16 @@ export type SavingThrow = {
     modifier: AttributeKey;
 };
 
+// --- Resource Costs ---
+
+// Beschreibt eine Änderung an einem CSB-Actor-Prop (z.B. -1 pc_default_bullets, +1 resonance_points_amount).
+// Wird IMMER angewendet (Treffer oder nicht) — analog zur Action-Ressource.
+export type ResourceCost = {
+    propKey: string;       // Key in actor.system.props
+    operator: "+" | "-";
+    amount: number;
+};
+
 // --- Spell Effects ---
 
 export type DotEffectType = "poison" | "burning" | "bleeding";
@@ -107,6 +117,8 @@ type StackItemBase = {
     pushSelf?: { distance: number };
     // Optional: Target(s) werden auf Resolve vom Caster/AOE-Center weggestoßen
     pushTarget?: { distance: number };
+    // Optional: CSB-Actor-Prop-Änderungen, werden bei Cast IMMER angewendet (Hit oder nicht)
+    resourceCosts?: ResourceCost[];
 };
 
 // --- Action ---

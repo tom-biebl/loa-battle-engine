@@ -1,4 +1,4 @@
-import { Action, AttributeKey, BonusAction, DamageType, SpellAnimations, SpellEffect } from "../models/StackItem";
+import { Action, AttributeKey, BonusAction, DamageType, ResourceCost, SpellAnimations, SpellEffect } from "../models/StackItem";
 import { BattleEngine } from "../BattleEngine";
 import { Notifications } from "../utils/Notifications";
 import { pickAOELocation } from "../utils/AOEPicker";
@@ -20,6 +20,7 @@ type MeleeOptions = {
     animations?: SpellAnimations;
     pushSelf?: PushOpt;     // Caster wird auf Resolve weggestoßen
     pushTarget?: PushOpt;   // Target wird auf Resolve weggestoßen
+    resourceCosts?: ResourceCost[];
 };
 
 type RangedOptions = {
@@ -32,6 +33,7 @@ type RangedOptions = {
     animations?: SpellAnimations;
     pushSelf?: PushOpt;
     pushTarget?: PushOpt;
+    resourceCosts?: ResourceCost[];
 };
 
 type TargetSpellOptions = {
@@ -44,6 +46,7 @@ type TargetSpellOptions = {
     animations?: SpellAnimations;
     pushSelf?: PushOpt;
     pushTarget?: PushOpt;
+    resourceCosts?: ResourceCost[];
 };
 
 type AOESpellOptions = {
@@ -55,6 +58,7 @@ type AOESpellOptions = {
     animations?: SpellAnimations;
     pushSelf?: PushOpt;
     pushTarget?: PushOpt;
+    resourceCosts?: ResourceCost[];
 };
 
 type Context = {
@@ -103,6 +107,7 @@ export class SpellManager {
         animations?: SpellAnimations,
         pushSelf?: PushOpt,
         pushTarget?: PushOpt,
+        resourceCosts?: ResourceCost[],
     ): Action | BonusAction {
         return {
             id: foundry.utils.randomID(),
@@ -120,6 +125,7 @@ export class SpellManager {
             animations,
             pushSelf,
             pushTarget,
+            resourceCosts,
         } as Action | BonusAction;
     }
 
@@ -147,6 +153,7 @@ export class SpellManager {
             opts.animations,
             opts.pushSelf,
             opts.pushTarget,
+            opts.resourceCosts,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -167,6 +174,7 @@ export class SpellManager {
             opts.animations,
             opts.pushSelf,
             opts.pushTarget,
+            opts.resourceCosts,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -187,6 +195,7 @@ export class SpellManager {
             opts.animations,
             opts.pushSelf,
             opts.pushTarget,
+            opts.resourceCosts,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -226,6 +235,7 @@ export class SpellManager {
             animations: opts.animations,
             pushSelf: opts.pushSelf,
             pushTarget: opts.pushTarget,
+            resourceCosts: opts.resourceCosts,
         } as Action;
 
         await ctx.engine.useAction(item);

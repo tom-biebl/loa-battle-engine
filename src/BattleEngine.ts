@@ -87,6 +87,7 @@ export class BattleEngine {
 
         participant.hasAction = false;
         this.persistParticipants();
+        await this.applyResourceCosts(action);
 
         switch (action.subtype) {
             case "damage-roll": {
@@ -138,6 +139,7 @@ export class BattleEngine {
 
         participant.hasBonusAction = false;
         this.persistParticipants();
+        await this.applyResourceCosts(bonusAction);
 
         switch (bonusAction.subtype) {
             case "damage-roll": {
@@ -182,6 +184,7 @@ export class BattleEngine {
 
         participant.hasReaction = false;
         this.persistParticipants();
+        await this.applyResourceCosts(reaction);
 
         switch (reaction.subtype) {
             case "counter":
@@ -460,6 +463,16 @@ export class BattleEngine {
 
     private getTokenName(tokenId: string): string {
         return canvas?.tokens?.get(tokenId)?.name ?? tokenId;
+    }
+
+    // Wendet alle ResourceCosts auf den Caster-Actor an. Wird IMMER aufgerufen,
+    // direkt nach Verbrauch der Action-Ressource — ob die Aktion trifft oder nicht.
+    private async applyResourceCosts(item: Action | BonusAction | Reaction): Promise<void> {
+        if (!item.resourceCosts?.length) return;
+        for (const cost of item.resourceCosts) {
+            const delta = cost.operator === "+" ? cost.amount : -cost.amount;
+            await this.actorManager.modifyProp(item.tokenId, cost.propKey, delta);
+        }
     }
 
     private pushItemToStack(item: StackItem): void {
