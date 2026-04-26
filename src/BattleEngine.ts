@@ -14,6 +14,12 @@ const MODULE_ID = "loa-battle-engine";
 const STACK_FLAG_KEY = "stack";
 const PARTICIPANTS_FLAG_KEY = "participants";
 
+const RESOURCE_LABELS: Record<string, string> = {
+    resonance_points_amount: "Resonanzpunkte",
+    pc_superiority_dice: "Superiority Dice",
+    pc_default_bullets: "Kugeln",
+};
+
 declare global {
     interface FlagConfig {
         Combat: {
@@ -89,6 +95,8 @@ export class BattleEngine {
         this.persistParticipants();
         await this.applyResourceCosts(action);
 
+        if (!(await this.performStabilityCheckIfNeeded(action.tokenId))) return;
+
         switch (action.subtype) {
             case "damage-roll": {
                 const hit = await this.performAcRoll(action.tokenId, action.targetTokenId, action.acModifier, action.name);
@@ -141,6 +149,8 @@ export class BattleEngine {
         this.persistParticipants();
         await this.applyResourceCosts(bonusAction);
 
+        if (!(await this.performStabilityCheckIfNeeded(bonusAction.tokenId))) return;
+
         switch (bonusAction.subtype) {
             case "damage-roll": {
                 const hit = await this.performAcRoll(bonusAction.tokenId, bonusAction.targetTokenId, bonusAction.acModifier, bonusAction.name);
@@ -185,6 +195,8 @@ export class BattleEngine {
         participant.hasReaction = false;
         this.persistParticipants();
         await this.applyResourceCosts(reaction);
+
+        if (!(await this.performStabilityCheckIfNeeded(reaction.tokenId))) return;
 
         switch (reaction.subtype) {
             case "counter":
@@ -419,8 +431,9 @@ export class BattleEngine {
 
         const modifier = this.resolveModifier(tokenId, acModifier);
         if (modifier === null) return false;
+        const totalModifier = modifier + this.getResonanceBonus(tokenId);
 
-        const roll = await this.rollManager.roll("d20", tokenId, modifier);
+        const roll = await this.rollManager.roll("d20", tokenId, totalModifier);
         const targetName = this.getTokenName(targetTokenId);
 
         if (roll < targetAC) {
@@ -436,8 +449,9 @@ export class BattleEngine {
     private async performDcRoll(tokenId: string, acModifier: AttributeKey, dc: number, actionName: string): Promise<boolean> {
         const modifier = this.resolveModifier(tokenId, acModifier);
         if (modifier === null) return false;
+        const totalModifier = modifier + this.getResonanceBonus(tokenId);
 
-        const roll = await this.rollManager.roll("d20", tokenId, modifier);
+        const roll = await this.rollManager.roll("d20", tokenId, totalModifier);
         if (roll < dc) {
             await ChatManager.miss(actionName, roll, `DC ${dc}`);
             return false;
@@ -467,12 +481,71 @@ export class BattleEngine {
 
     // Wendet alle ResourceCosts auf den Caster-Actor an. Wird IMMER aufgerufen,
     // direkt nach Verbrauch der Action-Ressource — ob die Aktion trifft oder nicht.
+    // Schickt für bekannte Ressourcen einen Chat-Eintrag und prüft RP-Thresholds.
     private async applyResourceCosts(item: Action | BonusAction | Reaction): Promise<void> {
         if (!item.resourceCosts?.length) return;
         for (const cost of item.resourceCosts) {
             const delta = cost.operator === "+" ? cost.amount : -cost.amount;
-            await this.actorManager.modifyProp(item.tokenId, cost.propKey, delta);
+            const result = await this.actorManager.modifyProp(item.tokenId, cost.propKey, delta);
+            if (!result) continue;
+
+            const label = RESOURCE_LABELS[cost.propKey] ?? cost.propKey;
+            await ChatManager.resourceChanged(label, result.newValue);
+
+            if (cost.propKey === "resonance_points_amount") {
+                await this.notifyResonanceThreshold(result.oldValue, result.newValue, item.tokenId);
+            }
         }
+    }
+
+    private async notifyResonanceThreshold(oldValue: number, newValue: number, tokenId: string): Promise<void> {
+        const actorName = this.getTokenName(tokenId);
+        if (oldValue < 15 && newValue >= 15) {
+            await ChatManager.resonanceThreshold(
+                `${actorName} hat <strong>15 Resonanzpunkte</strong> erreicht — Magie instabil! Stabilitätswurf vor jedem Cast, +3 auf Angriffswürfe.`
+            );
+        } else if (oldValue < 10 && newValue >= 10) {
+            await ChatManager.resonanceThreshold(
+                `${actorName} hat <strong>10 Resonanzpunkte</strong> erreicht — Magie verstärkt! +1 auf Angriffswürfe.`
+            );
+        }
+    }
+
+    // Resonanz-Bonus auf Angriffswürfe — automatisch je nach RP-Stand
+    private getResonanceBonus(tokenId: string): number {
+        const rp = this.actorManager.getResonancePoints(tokenId);
+        if (rp === undefined) return 0;
+        if (rp >= 15) return 3;
+        if (rp >= 10) return 1;
+        return 0;
+    }
+
+    // Stabilitätswurf — nur bei RP >= 15. Returns true wenn Cast weitergeht.
+    private async performStabilityCheckIfNeeded(tokenId: string): Promise<boolean> {
+        const rp = this.actorManager.getResonancePoints(tokenId);
+        if (rp === undefined || rp < 15) return true;
+
+        const roll = await this.rollManager.roll("d20", tokenId);
+        const actorName = this.getTokenName(tokenId);
+        const proceed = await this.askStabilityConfirm(actorName, roll);
+        await ChatManager.stabilityRoll(actorName, roll, proceed);
+        return proceed;
+    }
+
+    private askStabilityConfirm(actorName: string, roll: number): Promise<boolean> {
+        return new Promise((resolve) => {
+            const DialogCls = (globalThis as any).Dialog;
+            new DialogCls({
+                title: "Stabilitätswurf",
+                content: `<p><strong>${actorName}</strong> würfelt für Stabilität: <strong>${roll}</strong></p><p>Bewahrt der Caster die Stabilität? (GM-Entscheidung — DC variiert)</p>`,
+                buttons: {
+                    yes: { label: "Ja — Cast geht durch", callback: () => resolve(true) },
+                    no: { label: "Nein — Cast schlägt fehl", callback: () => resolve(false) },
+                },
+                default: "yes",
+                close: () => resolve(false),
+            }).render(true);
+        });
     }
 
     private pushItemToStack(item: StackItem): void {

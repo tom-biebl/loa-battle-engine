@@ -36,4 +36,24 @@ export class ChatManager {
             `Resonanzpunkte: <strong>${oldPoints}</strong> → <strong>${newPoints}</strong> <em>(${sign})</em>`
         );
     }
+
+    // Generische Ressourcen-Änderung (z.B. neue Kugeln/Resonanz/Superiority Dice nach einem Spell)
+    static async resourceChanged(label: string, newValue: number): Promise<void> {
+        await ChatManager.send(`<strong>Neue ${label}:</strong> ${newValue}`);
+    }
+
+    // Threshold-Notification (10/15 RP erreicht)
+    static async resonanceThreshold(message: string): Promise<void> {
+        await ChatManager.send(`<em>⚠ ${message}</em>`);
+    }
+
+    // Stabilitätswurf-Resultat
+    static async stabilityRoll(actorName: string, roll: number, success: boolean): Promise<void> {
+        const status = success
+            ? "<strong style='color:#3a3'>✓ bewahrt</strong>"
+            : "<strong style='color:#a33'>✗ verloren</strong>";
+        await ChatManager.send(
+            `<strong>${actorName}</strong> Stabilitätswurf: <strong>${roll}</strong> — ${status}`
+        );
+    }
 }

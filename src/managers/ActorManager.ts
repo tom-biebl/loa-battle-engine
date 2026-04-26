@@ -87,20 +87,22 @@ export class ActorManager {
 
     // Generische Prop-Änderung — addiert delta zum aktuellen Wert, clamped auf 0.
     // Verwendet für Resource-Kosten (Kugeln, Resonanzpunkte, Superiority Dice, etc.).
-    async modifyProp(tokenId: string, propKey: string, delta: number): Promise<void> {
+    // Gibt Old/New-Wert zurück (für Threshold-Checks und Chat-Messages).
+    async modifyProp(tokenId: string, propKey: string, delta: number): Promise<{ oldValue: number; newValue: number } | null> {
         const actor = getActorByToken(tokenId);
-        if (!actor) return;
+        if (!actor) return null;
 
         const props = (actor.system as unknown as { props: Record<string, unknown> }).props;
         if (!props) {
             console.error(`ActorManager: keine props auf Token ${tokenId}.`);
-            return;
+            return null;
         }
 
         const currentRaw = props[propKey];
-        const current = typeof currentRaw === "number" ? currentRaw : 0;
-        const newValue = Math.max(0, current + delta);
+        const oldValue = typeof currentRaw === "number" ? currentRaw : 0;
+        const newValue = Math.max(0, oldValue + delta);
 
         await actor.update({ [`system.props.${propKey}`]: newValue } as Parameters<typeof actor.update>[0]);
+        return { oldValue, newValue };
     }
 }

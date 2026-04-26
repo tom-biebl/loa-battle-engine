@@ -200,6 +200,46 @@ export class SpellManager {
         await this.dispatch(item, ctx.engine);
     }
 
+    // Konzentrations-Aktion — würfelt diceFormula und baut entsprechend RP ab.
+    // Würfel wird im SpellManager (Player-Side) gerollt, das Ergebnis als fixer Cost an _useAction übergeben.
+    static async useConcentration(opts: { name: string; diceFormula: string; kind?: AttackKind }): Promise<void> {
+        const ctx = this.getContext();
+        if (!ctx) return;
+
+        const RollCls = (globalThis as any).Roll;
+        const roll = new RollCls(opts.diceFormula);
+        await roll.evaluate();
+        const reduced = Number(roll.total ?? 0);
+        if (!Number.isFinite(reduced) || reduced <= 0) {
+            Notifications.error(`Konzentration: ungültiger Würfelwurf (${opts.diceFormula} = ${roll.total}).`);
+            return;
+        }
+
+        await (globalThis as any).ChatMessage.create({
+            content: `<strong>${opts.name}</strong>: ${reduced} RP abgebaut <em>(${opts.diceFormula})</em>`,
+            speaker: (globalThis as any).ChatMessage.getSpeaker(),
+        });
+
+        const item = {
+            id: foundry.utils.randomID(),
+            kind: opts.kind ?? "action",
+            subtype: "utility",
+            name: opts.name,
+            tokenId: ctx.tokenId,
+            actorId: ctx.actorId,
+            targetTokenId: undefined,
+            acModifier: "wis",
+            dc: 0,
+            hasToBeRolled: false,
+            stackIndex: Date.now(),
+            status: "pending",
+            resourceCosts: [{ propKey: "resonance_points_amount", operator: "-", amount: reduced }],
+        } as Action | BonusAction;
+
+        if (item.kind === "bonus-action") await ctx.engine.useBonusAction(item as BonusAction);
+        else await ctx.engine.useAction(item as Action);
+    }
+
     // AOE-Zauber — Player wählt Position per Cursor mit Radius-Kreis,
     // alle Tokens im Radius werden getroffen.
     static async castAOESpell(opts: AOESpellOptions): Promise<void> {
