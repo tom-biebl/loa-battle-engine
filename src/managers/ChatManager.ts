@@ -10,6 +10,12 @@ export class ChatManager {
         );
     }
 
+    static async criticalHit(actionName: string, roll: number, target: string): Promise<void> {
+        await ChatManager.send(
+            `<strong style="color:#f80">⚡ KRITISCHER TREFFER</strong> — <strong>${actionName}</strong> auf <strong>${target}</strong> <em>(Wurf: ${roll})</em>`
+        );
+    }
+
     static async miss(actionName: string, roll: number, target: string): Promise<void> {
         await ChatManager.send(
             `<strong>${actionName}</strong> verfehlt <strong>${target}</strong> <em>(Wurf: ${roll})</em>`

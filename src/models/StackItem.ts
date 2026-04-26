@@ -119,6 +119,8 @@ type StackItemBase = {
     pushTarget?: { distance: number };
     // Optional: CSB-Actor-Prop-Änderungen, werden bei Cast IMMER angewendet (Hit oder nicht)
     resourceCosts?: ResourceCost[];
+    // Wird bei Nat-20 auf dem AC-Wurf gesetzt — finaler Damage * 2 auf Resolve
+    isCritical?: boolean;
 };
 
 // --- Action ---
@@ -135,7 +137,9 @@ type DamageFixedAction = StackItemBase & {
     kind: "action";
     subtype: "damage-fixed";
     acModifier: AttributeKey;
-    damageFrame: FixedDamageFrame;
+    // Damage darf gewürfelt werden (RollableDamageFrame) oder bereits feststehen (FixedDamageFrame).
+    // "fixed" bezieht sich hier auf den Hit (kein AC-Wurf), nicht auf den Damage.
+    damageFrame: RollableDamageFrame | FixedDamageFrame;
     consumes?: Item;
 };
 
@@ -175,7 +179,7 @@ type DamageFixedBonusAction = StackItemBase & {
     kind: "bonus-action";
     subtype: "damage-fixed";
     acModifier: AttributeKey;
-    damageFrame: FixedDamageFrame;
+    damageFrame: RollableDamageFrame | FixedDamageFrame;
     consumes?: Item;
 };
 
@@ -226,7 +230,7 @@ type TriggerFixedReaction = StackItemBase & {
     subtype: "trigger-fixed";
     acModifier: AttributeKey;
     triggerItemId: string;
-    damageFrame: FixedDamageFrame;
+    damageFrame: RollableDamageFrame | FixedDamageFrame;
     consumes?: Item;
 };
 

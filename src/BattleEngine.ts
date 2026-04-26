@@ -99,8 +99,9 @@ export class BattleEngine {
 
         switch (action.subtype) {
             case "damage-roll": {
-                const hit = await this.performAcRoll(action.tokenId, action.targetTokenId, action.acModifier, action.name);
-                if (!hit) return;
+                const result = await this.performAcRoll(action.tokenId, action.targetTokenId, action.acModifier, action.name);
+                if (!result.hit) return;
+                if (result.critical) action.isCritical = true;
                 break;
             }
             case "damage-fixed": {
@@ -153,8 +154,9 @@ export class BattleEngine {
 
         switch (bonusAction.subtype) {
             case "damage-roll": {
-                const hit = await this.performAcRoll(bonusAction.tokenId, bonusAction.targetTokenId, bonusAction.acModifier, bonusAction.name);
-                if (!hit) return;
+                const result = await this.performAcRoll(bonusAction.tokenId, bonusAction.targetTokenId, bonusAction.acModifier, bonusAction.name);
+                if (!result.hit) return;
+                if (result.critical) bonusAction.isCritical = true;
                 break;
             }
             case "damage-fixed": {
@@ -203,8 +205,9 @@ export class BattleEngine {
             case "interrupt":
                 break;
             case "trigger-roll": {
-                const hit = await this.performAcRoll(reaction.tokenId, reaction.targetTokenId, reaction.acModifier, reaction.name);
-                if (!hit) return;
+                const result = await this.performAcRoll(reaction.tokenId, reaction.targetTokenId, reaction.acModifier, reaction.name);
+                if (!result.hit) return;
+                if (result.critical) reaction.isCritical = true;
                 break;
             }
             case "trigger-fixed": {
@@ -276,7 +279,7 @@ export class BattleEngine {
                     if (item.animations) {
                         await SequencerManager.playSpellSequence(item.tokenId, item.targetTokenId, item.animations);
                     }
-                    await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, item.damageFrame, item.name);
+                    await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, item.damageFrame, item.name, item.isCritical);
                     // Pushes nach Damage anwenden
                     if (item.pushTarget) {
                         await pushTokenAwayFrom(item.targetTokenId, { tokenId: item.tokenId }, item.pushTarget.distance);
@@ -298,7 +301,7 @@ export class BattleEngine {
                         if (item.animations) {
                             await SequencerManager.playSpellSequence(item.tokenId, trigger.tokenId, item.animations);
                         }
-                        await this.applyDamageFromFrame(item.tokenId, trigger.tokenId, item.damageFrame, item.name);
+                        await this.applyDamageFromFrame(item.tokenId, trigger.tokenId, item.damageFrame, item.name, item.isCritical);
                         break;
                     }
                     case "interrupt":
@@ -351,11 +354,15 @@ export class BattleEngine {
         attackerTokenId: string,
         targetTokenId: string,
         damageFrame: RollableDamageFrame | FixedDamageFrame,
-        name: string
+        name: string,
+        isCritical?: boolean,
     ): Promise<void> {
-        const rawDamage = "damageFormula" in damageFrame
+        const rolledDamage = "damageFormula" in damageFrame
             ? await this.rollManager.roll(damageFrame.damageFormula, attackerTokenId)
             : damageFrame.resolvedAmount;
+
+        // Crit verdoppelt den finalen Damage (kein Doppelwurf, einfach * 2)
+        const rawDamage = isCritical ? rolledDamage * 2 : rolledDamage;
 
         const reduction = this.actorManager.getArmorDamageReduction(targetTokenId) ?? 0;
         const finalDamage = Math.max(0, rawDamage - reduction);
@@ -417,32 +424,35 @@ export class BattleEngine {
     }
 
     // Führt einen AC-Wurf durch und schickt Hit/Miss in den Chat. Gibt true bei Treffer zurück.
-    private async performAcRoll(tokenId: string, targetTokenId: string | undefined, acModifier: AttributeKey, actionName: string): Promise<boolean> {
+    private async performAcRoll(tokenId: string, targetTokenId: string | undefined, acModifier: AttributeKey, actionName: string): Promise<{ hit: boolean; critical: boolean }> {
         if (!targetTokenId) {
             Notifications.error("Kein Target selektiert!");
-            return false;
+            return { hit: false, critical: false };
         }
 
         const targetAC = this.actorManager.getArmorClass(targetTokenId);
         if (!targetAC) {
             Notifications.error(`Keine AC für Token ${targetTokenId} gefunden.`);
-            return false;
+            return { hit: false, critical: false };
         }
 
         const modifier = this.resolveModifier(tokenId, acModifier);
-        if (modifier === null) return false;
+        if (modifier === null) return { hit: false, critical: false };
         const totalModifier = modifier + this.getResonanceBonus(tokenId);
 
         const roll = await this.rollManager.roll("d20", tokenId, totalModifier);
+        const naturalRoll = roll - totalModifier;
+        const critical = naturalRoll === 20;
         const targetName = this.getTokenName(targetTokenId);
 
-        if (roll < targetAC) {
+        if (roll < targetAC && !critical) {
             await ChatManager.miss(actionName, roll, targetName);
-            return false;
+            return { hit: false, critical: false };
         }
 
-        await ChatManager.hit(actionName, roll, targetName);
-        return true;
+        if (critical) await ChatManager.criticalHit(actionName, roll, targetName);
+        else await ChatManager.hit(actionName, roll, targetName);
+        return { hit: true, critical };
     }
 
     // Führt einen DC-Wurf durch und schickt Miss in den Chat bei Misserfolg. Gibt true bei Erfolg zurück.

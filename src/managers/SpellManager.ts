@@ -21,6 +21,7 @@ type MeleeOptions = {
     pushSelf?: PushOpt;     // Caster wird auf Resolve weggestoßen
     pushTarget?: PushOpt;   // Target wird auf Resolve weggestoßen
     resourceCosts?: ResourceCost[];
+    noAcRoll?: boolean;     // wenn true → kein AC-Wurf, garantierter Hit
 };
 
 type RangedOptions = {
@@ -34,6 +35,7 @@ type RangedOptions = {
     pushSelf?: PushOpt;
     pushTarget?: PushOpt;
     resourceCosts?: ResourceCost[];
+    noAcRoll?: boolean;     // wenn true → kein AC-Wurf, garantierter Hit
 };
 
 type TargetSpellOptions = {
@@ -47,6 +49,7 @@ type TargetSpellOptions = {
     pushSelf?: PushOpt;
     pushTarget?: PushOpt;
     resourceCosts?: ResourceCost[];
+    noAcRoll?: boolean;     // wenn true → kein AC-Wurf, garantierter Hit
 };
 
 type AOESpellOptions = {
@@ -59,6 +62,7 @@ type AOESpellOptions = {
     pushSelf?: PushOpt;
     pushTarget?: PushOpt;
     resourceCosts?: ResourceCost[];
+    noAcRoll?: boolean;     // wenn true → kein AC-Wurf, garantierter Hit
 };
 
 type Context = {
@@ -108,11 +112,13 @@ export class SpellManager {
         pushSelf?: PushOpt,
         pushTarget?: PushOpt,
         resourceCosts?: ResourceCost[],
+        noAcRoll?: boolean,
     ): Action | BonusAction {
         return {
             id: foundry.utils.randomID(),
             kind,
-            subtype: "damage-roll",
+            // noAcRoll → "damage-fixed" (kein AC-Wurf), sonst "damage-roll"
+            subtype: noAcRoll ? "damage-fixed" : "damage-roll",
             name,
             tokenId: ctx.tokenId,
             actorId: ctx.actorId,
@@ -154,6 +160,7 @@ export class SpellManager {
             opts.pushSelf,
             opts.pushTarget,
             opts.resourceCosts,
+            opts.noAcRoll,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -175,6 +182,7 @@ export class SpellManager {
             opts.pushSelf,
             opts.pushTarget,
             opts.resourceCosts,
+            opts.noAcRoll,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -196,6 +204,7 @@ export class SpellManager {
             opts.pushSelf,
             opts.pushTarget,
             opts.resourceCosts,
+            opts.noAcRoll,
         );
         await this.dispatch(item, ctx.engine);
     }
