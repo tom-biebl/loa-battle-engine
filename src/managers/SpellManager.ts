@@ -1,10 +1,14 @@
-import { Action, AttributeKey, BonusAction, DamageType, SpellEffect } from "../models/StackItem";
+import { Action, AttributeKey, BonusAction, DamageType, SpellAnimations, SpellEffect } from "../models/StackItem";
 import { BattleEngine } from "../BattleEngine";
 import { Notifications } from "../utils/Notifications";
+import { pickAOELocation } from "../utils/AOEPicker";
+import { pushTokenAwayFrom } from "../utils/TokenMovement";
 
 const MODULE_ID = "loa-battle-engine";
 
 type AttackKind = "action" | "bonus-action";
+
+type PushOpt = { distance: number };
 
 type MeleeOptions = {
     name: string;
@@ -13,6 +17,9 @@ type MeleeOptions = {
     damageType?: DamageType;
     kind?: AttackKind;
     spellEffect?: SpellEffect;
+    animations?: SpellAnimations;
+    pushSelf?: PushOpt;     // Caster wird auf Resolve weggestoßen
+    pushTarget?: PushOpt;   // Target wird auf Resolve weggestoßen
 };
 
 type RangedOptions = {
@@ -22,6 +29,9 @@ type RangedOptions = {
     damageType?: DamageType;
     kind?: AttackKind;
     spellEffect?: SpellEffect;
+    animations?: SpellAnimations;
+    pushSelf?: PushOpt;
+    pushTarget?: PushOpt;
 };
 
 type TargetSpellOptions = {
@@ -31,6 +41,20 @@ type TargetSpellOptions = {
     damageType: DamageType;
     kind?: AttackKind;
     spellEffect?: SpellEffect;
+    animations?: SpellAnimations;
+    pushSelf?: PushOpt;
+    pushTarget?: PushOpt;
+};
+
+type AOESpellOptions = {
+    name: string;
+    damageFormula: string;
+    damageType: DamageType;
+    radius: number; // in Fuß
+    spellEffect?: SpellEffect;
+    animations?: SpellAnimations;
+    pushSelf?: PushOpt;
+    pushTarget?: PushOpt;
 };
 
 type Context = {
@@ -76,6 +100,9 @@ export class SpellManager {
         acModifier: AttributeKey,
         kind: AttackKind,
         spellEffect?: SpellEffect,
+        animations?: SpellAnimations,
+        pushSelf?: PushOpt,
+        pushTarget?: PushOpt,
     ): Action | BonusAction {
         return {
             id: foundry.utils.randomID(),
@@ -90,6 +117,9 @@ export class SpellManager {
             stackIndex: Date.now(),
             status: "pending",
             spellEffect,
+            animations,
+            pushSelf,
+            pushTarget,
         } as Action | BonusAction;
     }
 
@@ -114,6 +144,9 @@ export class SpellManager {
             opts.acModifier ?? "str",
             opts.kind ?? "action",
             opts.spellEffect,
+            opts.animations,
+            opts.pushSelf,
+            opts.pushTarget,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -131,6 +164,9 @@ export class SpellManager {
             opts.acModifier ?? "dex",
             opts.kind ?? "action",
             opts.spellEffect,
+            opts.animations,
+            opts.pushSelf,
+            opts.pushTarget,
         );
         await this.dispatch(item, ctx.engine);
     }
@@ -148,8 +184,51 @@ export class SpellManager {
             opts.acModifier,
             opts.kind ?? "action",
             opts.spellEffect,
+            opts.animations,
+            opts.pushSelf,
+            opts.pushTarget,
         );
         await this.dispatch(item, ctx.engine);
+    }
+
+    // AOE-Zauber — Player wählt Position per Cursor mit Radius-Kreis,
+    // alle Tokens im Radius werden getroffen.
+    static async castAOESpell(opts: AOESpellOptions): Promise<void> {
+        const ctx = this.getContext();
+        if (!ctx) return;
+
+        Notifications.info(`Position für ${opts.name} wählen (Linksklick) — Rechtsklick zum Abbrechen`);
+        const placement = await pickAOELocation(opts.radius);
+        if (!placement) {
+            Notifications.info("AOE abgebrochen.");
+            return;
+        }
+        if (placement.affectedTokenIds.length === 0) {
+            Notifications.warn("Keine Tokens im Radius getroffen.");
+            return;
+        }
+
+        const item: Action = {
+            id: foundry.utils.randomID(),
+            kind: "action",
+            subtype: "damage-aoe",
+            name: opts.name,
+            tokenId: ctx.tokenId,
+            actorId: ctx.actorId,
+            targetTokenId: undefined,
+            damageFrame: { damageFormula: opts.damageFormula, damageType: opts.damageType },
+            affectedTokenIds: placement.affectedTokenIds,
+            aoeCenter: { x: placement.x, y: placement.y },
+            aoeRadius: opts.radius,
+            stackIndex: Date.now(),
+            status: "pending",
+            spellEffect: opts.spellEffect,
+            animations: opts.animations,
+            pushSelf: opts.pushSelf,
+            pushTarget: opts.pushTarget,
+        } as Action;
+
+        await ctx.engine.useAction(item);
     }
 
     // --- Bewegung / Effekte ---
@@ -162,7 +241,7 @@ export class SpellManager {
         if (!target) { Notifications.error("Kein Target als Richtungsreferenz!"); return; }
 
         // Eigener Token — Spieler hat Permission, direkt bewegen
-        await this.pushTokenAwayFrom(token, target, opts.distance);
+        await pushTokenAwayFrom(token.id, { tokenId: target.id }, opts.distance);
     }
 
     // Stoß — Target wird vom eigenen Token weggestoßen (distance in Grid-Zellen)
@@ -173,7 +252,7 @@ export class SpellManager {
         if (!target) { Notifications.error("Kein Target!"); return; }
 
         if (game.user?.isGM) {
-            await this.pushTokenAwayFrom(target, token, opts.distance);
+            await pushTokenAwayFrom(target.id, { tokenId: token.id }, opts.distance);
         } else {
             game.socket?.emit("module.loa-battle-engine", {
                 type: "pushTokenAwayFrom",
@@ -219,10 +298,7 @@ export class SpellManager {
     // --- Socket-Callable Internals ---
 
     static async _pushTokenAwayFromBy(tokenToMoveId: string, fromTokenId: string, distance: number): Promise<void> {
-        const tokenToMove = canvas?.tokens?.get(tokenToMoveId);
-        const fromToken = canvas?.tokens?.get(fromTokenId);
-        if (!tokenToMove || !fromToken) return;
-        await this.pushTokenAwayFrom(tokenToMove, fromToken, distance);
+        await pushTokenAwayFrom(tokenToMoveId, { tokenId: fromTokenId }, distance);
     }
 
     static async _applyEffect(targetTokenId: string, effectId: string): Promise<void> {
@@ -233,51 +309,11 @@ export class SpellManager {
 
     // --- Private Helpers ---
 
-    // Bewegt tokenToMove weg von fromToken (Richtung: fromToken → tokenToMove, dann weiter)
-    // Stoppt bei Map-Grenze oder Kollision mit anderem Token.
-    private static async pushTokenAwayFrom(tokenToMove: any, fromToken: any, distance: number): Promise<void> {
-        const gridSize = canvas?.grid?.size ?? 100;
-
-        const angle = Math.atan2(tokenToMove.y - fromToken.y, tokenToMove.x - fromToken.x);
-        const dx = Math.round(Math.cos(angle));
-        const dy = Math.round(Math.sin(angle));
-        if (dx === 0 && dy === 0) return;
-
-        let finalX = tokenToMove.x;
-        let finalY = tokenToMove.y;
-
-        for (let i = 1; i <= distance; i++) {
-            const testX = tokenToMove.x + dx * gridSize * i;
-            const testY = tokenToMove.y + dy * gridSize * i;
-
-            if (!this.isInBounds(testX, testY)) break;
-            if (this.hasTokenAt(testX, testY, tokenToMove.id)) break;
-
-            finalX = testX;
-            finalY = testY;
-        }
-
-        if (finalX !== tokenToMove.x || finalY !== tokenToMove.y) {
-            await tokenToMove.document.update({ x: finalX, y: finalY });
-        }
-    }
-
     private static isInBounds(x: number, y: number): boolean {
         const scene = canvas?.scene;
         const dims = (scene as any)?.dimensions;
         if (!dims) return false;
         const gridSize = canvas?.grid?.size ?? 100;
         return x >= 0 && y >= 0 && x + gridSize <= dims.width && y + gridSize <= dims.height;
-    }
-
-    private static hasTokenAt(x: number, y: number, excludeTokenId: string): boolean {
-        const gridSize = canvas?.grid?.size ?? 100;
-        const tokens = canvas?.tokens?.placeables ?? [];
-        return tokens.some((t: any) => {
-            if (t.id === excludeTokenId) return false;
-            const w = (t.document?.width ?? 1) * gridSize;
-            const h = (t.document?.height ?? 1) * gridSize;
-            return x >= t.x && x < t.x + w && y >= t.y && y < t.y + h;
-        });
     }
 }

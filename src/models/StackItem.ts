@@ -40,6 +40,39 @@ export type StatusEffect = {
 
 export type SpellEffect = DotEffect | StatusEffect;
 
+// --- Animations & Sound ---
+
+export type SoundConfig = {
+    file: string;
+    volume?: number;
+};
+
+export type AnimationConfig = {
+    file: string;
+    scale?: number;
+    belowTokens?: boolean;
+    fadeOut?: number;
+    sound?: SoundConfig;
+};
+
+// Projektil-Varianten je nach Entfernung (mindestens eine muss gesetzt sein)
+export type ProjectileAnimationConfig = {
+    "5ft"?: string;
+    "15ft"?: string;
+    "30ft"?: string;
+    "60ft"?: string;
+    "90ft"?: string;
+    scale?: number;
+    sound?: SoundConfig;
+};
+
+export type SpellAnimations = {
+    caster?: AnimationConfig;     // auf Caster-Token
+    projectile?: ProjectileAnimationConfig;  // Caster → Target
+    target?: AnimationConfig;     // auf Target-Token / AOE-Zentrum
+    sound?: SoundConfig;          // globaler Cast-Sound
+};
+
 // Schaden der noch gewürfelt werden muss
 export type RollableDamageFrame = {
     damageFormula: string;
@@ -68,6 +101,12 @@ type StackItemBase = {
     savingThrow?: SavingThrow;
     // Optional: an einen Spell angehängter Effekt (Gift, Brand, etc.)
     spellEffect?: SpellEffect;
+    // Optional: Animationen die beim Resolve abgespielt werden
+    animations?: SpellAnimations;
+    // Optional: Caster wird auf Resolve vom Target/AOE-Center weggestoßen (Rückstoß)
+    pushSelf?: { distance: number };
+    // Optional: Target(s) werden auf Resolve vom Caster/AOE-Center weggestoßen
+    pushTarget?: { distance: number };
 };
 
 // --- Action ---
@@ -95,10 +134,20 @@ type UtilityAction = StackItemBase & {
     dc: number;
     consumes?: Item;
     hasToBeRolled: boolean;
-    
+
 };
 
-export type Action = DamageRollAction | DamageFixedAction | UtilityAction;
+type DamageAOEAction = StackItemBase & {
+    kind: "action";
+    subtype: "damage-aoe";
+    damageFrame: RollableDamageFrame;
+    affectedTokenIds: string[];
+    aoeCenter: { x: number; y: number };
+    aoeRadius: number; // in Fuß
+    consumes?: Item;
+};
+
+export type Action = DamageRollAction | DamageFixedAction | UtilityAction | DamageAOEAction;
 
 // --- BonusAction ---
 

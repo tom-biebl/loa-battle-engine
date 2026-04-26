@@ -7,6 +7,8 @@ import { Notifications } from "./utils/Notifications";
 import { ActorManager } from "./managers/ActorManager";
 import { ChatManager } from "./managers/ChatManager";
 import { procReactionMacros } from "./utils/ReactionProc";
+import { SequencerManager } from "./managers/SequencerManager";
+import { pushTokenAwayFrom } from "./utils/TokenMovement";
 
 const MODULE_ID = "loa-battle-engine";
 const STACK_FLAG_KEY = "stack";
@@ -103,6 +105,13 @@ export class BattleEngine {
                 if (action.hasToBeRolled) {
                     const passed = await this.performDcRoll(action.tokenId, action.acModifier, action.dc, action.name);
                     if (!passed) return;
+                }
+                break;
+            }
+            case "damage-aoe": {
+                if (!action.affectedTokenIds?.length) {
+                    Notifications.error("AOE ohne betroffene Tokens!");
+                    return;
                 }
                 break;
             }
@@ -249,7 +258,19 @@ export class BattleEngine {
             case "bonus-action":
                 if (item.subtype === "damage-roll" || item.subtype === "damage-fixed") {
                     if (!item.targetTokenId) return;
+                    if (item.animations) {
+                        await SequencerManager.playSpellSequence(item.tokenId, item.targetTokenId, item.animations);
+                    }
                     await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, item.damageFrame, item.name);
+                    // Pushes nach Damage anwenden
+                    if (item.pushTarget) {
+                        await pushTokenAwayFrom(item.targetTokenId, { tokenId: item.tokenId }, item.pushTarget.distance);
+                    }
+                    if (item.pushSelf) {
+                        await pushTokenAwayFrom(item.tokenId, { tokenId: item.targetTokenId }, item.pushSelf.distance);
+                    }
+                } else if (item.kind === "action" && item.subtype === "damage-aoe") {
+                    await this.resolveAOE(item);
                 }
                 break;
 
@@ -259,6 +280,9 @@ export class BattleEngine {
                     case "trigger-fixed": {
                         const trigger = sorted.find(i => i.id === item.triggerItemId);
                         if (!trigger) return;
+                        if (item.animations) {
+                            await SequencerManager.playSpellSequence(item.tokenId, trigger.tokenId, item.animations);
+                        }
                         await this.applyDamageFromFrame(item.tokenId, trigger.tokenId, item.damageFrame, item.name);
                         break;
                     }
@@ -279,6 +303,33 @@ export class BattleEngine {
                 await this.resolveEffectTick(item);
                 break;
         }
+    }
+
+    private async resolveAOE(item: Extract<StackItem, { subtype: "damage-aoe" }>): Promise<void> {
+        // AOE-Animation am Center
+        if (item.animations) {
+            await SequencerManager.playAOESequence(item.tokenId, item.aoeCenter, item.animations);
+        }
+
+        // Damage einmal würfeln, auf alle betroffenen Tokens anwenden
+        const rawDamage = await this.rollManager.roll(item.damageFrame.damageFormula, item.tokenId);
+        for (const targetId of item.affectedTokenIds) {
+            const reduction = this.actorManager.getArmorDamageReduction(targetId) ?? 0;
+            const finalDamage = Math.max(0, rawDamage - reduction);
+            await ChatManager.damage(item.name, rawDamage, finalDamage, item.damageFrame.damageType, this.getTokenName(targetId));
+            await this.actorManager.applyDamage(targetId, finalDamage);
+        }
+
+        // AOE-Pushes: alle betroffenen Tokens vom AOE-Center wegstoßen, optional auch Caster
+        if (item.pushTarget) {
+            for (const targetId of item.affectedTokenIds) {
+                await pushTokenAwayFrom(targetId, item.aoeCenter, item.pushTarget.distance);
+            }
+        }
+        if (item.pushSelf) {
+            await pushTokenAwayFrom(item.tokenId, item.aoeCenter, item.pushSelf.distance);
+        }
+        // SpellEffect-Apply wird per maybePushEffectApply zu Push-Zeit gepusht (nicht hier).
     }
 
     private async applyDamageFromFrame(
@@ -422,16 +473,32 @@ export class BattleEngine {
 
     // Wenn ein Action/BonusAction/Reaction einen SpellEffect angehängt hat,
     // wird ein effect-apply Item mit niedrigerem stackIndex gepusht (resolve NACH dem Parent).
+    // Für AOE: ein effect-apply pro betroffenem Token — individuell counter-bar.
     private maybePushEffectApply(parent: Action | BonusAction | Reaction): void {
-        if (!parent.spellEffect || !parent.targetTokenId) return;
+        if (!parent.spellEffect) return;
+
+        if (parent.kind === "action" && parent.subtype === "damage-aoe") {
+            for (const targetId of parent.affectedTokenIds) {
+                const targetActor = canvas?.tokens?.get(targetId)?.actor;
+                this.pushEffectApplyItem(parent, targetId, targetActor?.id as string | undefined);
+            }
+            return;
+        }
+
+        if (!parent.targetTokenId) return;
         const targetActor = canvas?.tokens?.get(parent.targetTokenId)?.actor;
+        this.pushEffectApplyItem(parent, parent.targetTokenId, targetActor?.id as string | undefined);
+    }
+
+    private pushEffectApplyItem(parent: Action | BonusAction | Reaction, targetTokenId: string, targetActorId: string | undefined): void {
+        if (!parent.spellEffect) return;
         this.pushItemToStack({
             id: foundry.utils.randomID(),
             name: `${parent.spellEffect.name} (Apply)`,
             tokenId: parent.tokenId,
             actorId: parent.actorId,
-            targetTokenId: parent.targetTokenId,
-            targetActorId: targetActor?.id,
+            targetTokenId,
+            targetActorId,
             kind: "effect-apply",
             effect: parent.spellEffect,
             stackIndex: parent.stackIndex - 1,

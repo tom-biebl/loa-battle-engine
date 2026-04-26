@@ -3,8 +3,10 @@ import { DialogManager } from "./managers/DialogManager";
 import { RollManager } from "./managers/RollManager";
 import { ActorManager } from "./managers/ActorManager";
 import { SpellManager } from "./managers/SpellManager";
+import { SequencerManager } from "./managers/SequencerManager";
 import { StackDialog } from "./dialogs/StackDialog";
 import { procReactionMacros } from "./utils/ReactionProc";
+import { pickAOELocation } from "./utils/AOEPicker";
 import "./styles/reaction-proc.scss";
 
 const MODULE_ID = "loa-battle-engine";
@@ -32,6 +34,8 @@ Hooks.once("ready", () => {
   const mod = game.modules?.get(MODULE_ID) as any;
   mod.api = engine;
   mod.spells = SpellManager;
+  mod.sequencer = SequencerManager;
+  mod.pickAOE = pickAOELocation;
 
   // Socket-Handler
   game.socket?.on(`module.${MODULE_ID}`, async (data: any) => {
