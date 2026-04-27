@@ -60,6 +60,15 @@ export class ChatManager {
     }
 
     // Stabilitätswurf-Resultat
+    static async dodgeRoll(actorName: string, roll: number, success: boolean): Promise<void> {
+        const status = success
+            ? "<strong style='color:#3a3'>✓ ausgewichen</strong>"
+            : "<strong style='color:#a33'>✗ getroffen</strong>";
+        await ChatManager.send(
+            `<strong>${actorName}</strong> Ausweichwurf: <strong>${roll}</strong> — ${status}`
+        );
+    }
+
     static async stabilityRoll(actorName: string, roll: number, success: boolean): Promise<void> {
         const status = success
             ? "<strong style='color:#3a3'>✓ bewahrt</strong>"

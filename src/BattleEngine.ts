@@ -231,6 +231,21 @@ export class BattleEngine {
                 }
                 break;
             }
+            case "dodge": {
+                if (!reaction.triggerItemId) {
+                    Notifications.error("Dodge ohne Trigger-Item!");
+                    return;
+                }
+                const modifier = this.resolveModifier(reaction.tokenId, reaction.acModifier);
+                if (modifier === null) return;
+                const roll = await this.rollManager.roll("d20", reaction.tokenId, modifier);
+                const actorName = this.getTokenName(reaction.tokenId);
+                const dodged = await this.askDodgeConfirm(actorName, roll);
+                reaction.rollResult = roll;
+                reaction.dodged = dodged;
+                await ChatManager.dodgeRoll(actorName, roll, dodged);
+                break;
+            }
             default:
                 console.error("Unbekannter reaction.subtype.");
                 return;
@@ -260,10 +275,12 @@ export class BattleEngine {
 
         const sorted = [...this.stack].sort((a, b) => b.stackIndex - a.stackIndex);
 
-        // Pass 1 (LIFO): Counter-Checks — jedes Counter-Item cancelt gezielt sein triggerItemId
+        // Pass 1 (LIFO): Counter-Checks — Counter und erfolgreiche Dodges cancelln ihren triggerItemId
         for (const item of sorted) {
-            if (item.kind !== "reaction" || item.subtype !== "counter") continue;
+            if (item.kind !== "reaction") continue;
             if (item.status !== "pending") continue;
+            const cancels = item.subtype === "counter" || (item.subtype === "dodge" && item.dodged === true);
+            if (!cancels) continue;
 
             const targeted = sorted.find(i => i.id === item.triggerItemId && i.status === "pending");
             if (!targeted) continue;
@@ -330,6 +347,7 @@ export class BattleEngine {
                         // Effekte — später
                         break;
                     case "counter":
+                    case "dodge":
                         // Bereits in Pass 1 behandelt
                         break;
                 }
@@ -407,6 +425,8 @@ export class BattleEngine {
     }
 
     public initParticipants(): void {
+        // Nur der aktive GM darf den Combat updaten — Spieler-Clients syncen über den Flag-Hook.
+        if (game.user !== (game.users as any)?.activeGM) return;
         const combat = game.combat;
         if (!combat) return;
 
@@ -562,6 +582,22 @@ export class BattleEngine {
         const proceed = await this.askStabilityConfirm(actorName, roll);
         await ChatManager.stabilityRoll(actorName, roll, proceed);
         return proceed;
+    }
+
+    private askDodgeConfirm(actorName: string, roll: number): Promise<boolean> {
+        return new Promise((resolve) => {
+            const DialogCls = (globalThis as any).Dialog;
+            new DialogCls({
+                title: "Ausweichwurf",
+                content: `<p><strong>${actorName}</strong> würfelt zum Ausweichen: <strong>${roll}</strong></p><p>Erfolgreich? (GM-Entscheidung — DC variiert)</p>`,
+                buttons: {
+                    yes: { label: "Ja — ausgewichen, kein Schaden", callback: () => resolve(true) },
+                    no: { label: "Nein — Treffer", callback: () => resolve(false) },
+                },
+                default: "yes",
+                close: () => resolve(false),
+            }).render(true);
+        });
     }
 
     private askStabilityConfirm(actorName: string, roll: number): Promise<boolean> {

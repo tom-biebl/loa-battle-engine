@@ -113,12 +113,13 @@ export class SequencerManager {
             const distFeet = this.getDistanceInFeet(caster, target);
             const file = this.selectProjectileFile(anims.projectile, distFeet);
             if (file) {
-                const e = seq.effect().file(file).atLocation(caster).stretchTo(target);
-                if (anims.projectile.scale !== undefined) e.scale(anims.projectile.scale);
-                e.waitUntilFinished();
+                // Sound VOR dem waitUntilFinished hinzufügen — startet parallel zum Projektil
                 if (anims.projectile.sound) {
                     seq.sound().file(anims.projectile.sound.file).volume(anims.projectile.sound.volume ?? 1);
                 }
+                const e = seq.effect().file(file).atLocation(caster).stretchTo(target);
+                if (anims.projectile.scale !== undefined) e.scale(anims.projectile.scale);
+                e.waitUntilFinished();
             }
         }
 

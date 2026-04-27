@@ -255,7 +255,7 @@ export class SpellManager {
     // - trigger-fixed: kein AC-Wurf, Damage immer
     static async useReaction(opts: {
         name: string;
-        subtype: "counter" | "interrupt" | "trigger-roll" | "trigger-fixed";
+        subtype: "counter" | "interrupt" | "trigger-roll" | "trigger-fixed" | "dodge";
         damageFormula?: string;
         damageType?: DamageType;
         acModifier?: AttributeKey;
@@ -299,6 +299,8 @@ export class SpellManager {
                 damageFormula: opts.damageFormula ?? "1d4",
                 damageType: opts.damageType ?? "physical",
             };
+        } else if (opts.subtype === "dodge") {
+            base.acModifier = opts.acModifier ?? "dex";
         }
 
         await ctx.engine.useReaction(base);

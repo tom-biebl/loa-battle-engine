@@ -248,7 +248,19 @@ type TriggerFixedReaction = StackItemBase & {
     consumes?: Item;
 };
 
-export type Reaction = CounterReaction | InterruptReaction | TriggerRollReaction | TriggerFixedReaction;
+// Dodge — Spieler würfelt (typisch dex), GM entscheidet pass/fail.
+// Bei Erfolg wird das triggerItem gecountert (kein Damage).
+type DodgeReaction = StackItemBase & {
+    kind: "reaction";
+    subtype: "dodge";
+    acModifier: AttributeKey;
+    triggerItemId: string;
+    rollResult?: number;
+    dodged?: boolean;
+    consumes?: Item;
+};
+
+export type Reaction = CounterReaction | InterruptReaction | TriggerRollReaction | TriggerFixedReaction | DodgeReaction;
 
 // --- Effect Stack Items ---
 
