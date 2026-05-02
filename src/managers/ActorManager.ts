@@ -103,8 +103,13 @@ export class ActorManager {
             return null;
         }
 
-        const currentRaw = props[propKey];
-        const oldValue = typeof currentRaw === "number" ? currentRaw : 0;
+        // CSB kann Werte als Number ODER numerischer String speichern → robuste Coercion
+        const raw = props[propKey];
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) {
+            console.warn(`ActorManager: Prop '${propKey}' nicht numerisch (Wert: ${JSON.stringify(raw)}). Falle zurück auf 0.`);
+        }
+        const oldValue = Number.isFinite(numeric) ? numeric : 0;
         const newValue = Math.max(0, oldValue + delta);
 
         await actor.update({ [`system.props.${propKey}`]: newValue } as Parameters<typeof actor.update>[0]);

@@ -121,6 +121,10 @@ type StackItemBase = {
     resourceCosts?: ResourceCost[];
     // Wird bei Nat-20 auf dem AC-Wurf gesetzt — finaler Damage * 2 auf Resolve
     isCritical?: boolean;
+    // Akkumuliert von block-Reaktionen — wird auf Resolve vom rohen Damage abgezogen
+    incomingDamageReduction?: number;
+    // Vom GM im Stack-Dialog gesetzt — beeinflusst AC-Wurf bei Resolve
+    rollMode?: "normal" | "advantage" | "disadvantage";
 };
 
 // --- Action ---
@@ -260,7 +264,17 @@ type DodgeReaction = StackItemBase & {
     consumes?: Item;
 };
 
-export type Reaction = CounterReaction | InterruptReaction | TriggerRollReaction | TriggerFixedReaction | DodgeReaction;
+// Block — reduziert eingehenden Damage des triggerItems um den gewürfelten Wert.
+// (im Gegensatz zu trigger-* die Damage AN den Trigger-Source machen)
+type BlockReaction = StackItemBase & {
+    kind: "reaction";
+    subtype: "block";
+    triggerItemId: string;
+    damageFrame: RollableDamageFrame | FixedDamageFrame;
+    consumes?: Item;
+};
+
+export type Reaction = CounterReaction | InterruptReaction | TriggerRollReaction | TriggerFixedReaction | DodgeReaction | BlockReaction;
 
 // --- Effect Stack Items ---
 

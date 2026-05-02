@@ -4,8 +4,10 @@
       <thead>
         <tr>
           <th>Typ</th>
+          <th>Subtype</th>
           <th>Actor</th>
           <th>Ziel</th>
+          <th>Wurf-Mod</th>
           <th></th>
         </tr>
       </thead>
@@ -13,8 +15,16 @@
         {{#each stack}}
         <tr class="stack-row stack-row--{{this.kind}}">
           <td><span class="stack-badge stack-badge--{{this.kind}}">{{this.kindLabel}}</span></td>
+          <td><span class="stack-subtype">{{this.subtypeLabel}}</span></td>
           <td>{{this.actorDisplay}}</td>
           <td>{{this.targetDisplay}}</td>
+          <td>
+            {{#if this.canRollMode}}
+              <button class="stack-item__rollmode {{this.rollModeClass}}" data-index="{{this.index}}" data-mode="{{this.rollMode}}" title="Klick: zyklisch Normal → Vorteil → Nachteil">{{this.rollModeLabel}}</button>
+            {{else}}
+              —
+            {{/if}}
+          </td>
           <td>
             <button class="stack-item__delete" data-index="{{this.index}}" title="Entfernen">
               <i class="fas fa-trash-alt"></i>
@@ -23,7 +33,7 @@
         </tr>
         {{else}}
         <tr>
-          <td colspan="4" class="stack-empty">Stack ist leer.</td>
+          <td colspan="6" class="stack-empty">Stack ist leer.</td>
         </tr>
         {{/each}}
       </tbody>

@@ -22,11 +22,25 @@ export class ChatManager {
         );
     }
 
-    static async damage(actionName: string, rawDamage: number, finalDamage: number, damageType: string, target: string): Promise<void> {
-        const reductionNote = rawDamage !== finalDamage ? ` <em>(${rawDamage} - ${rawDamage - finalDamage} Rüstung)</em>` : "";
+    // Public-Damage-Message — zeigt NUR den finalen Schaden (keine Aufschlüsselung,
+    // damit Spieler keine Rüstungs-/Block-Werte von NPCs ableiten können).
+    // Block-/Armor-Details kommen als GM-Whisper.
+    static async damage(actionName: string, rawDamage: number, finalDamage: number, damageType: string, target: string, blockReduction = 0, armorReduction = 0): Promise<void> {
         await ChatManager.send(
-            `<strong>${actionName}</strong> trifft <strong>${target}</strong> für <strong>${finalDamage} ${damageType}</strong> Schaden${reductionNote}`
+            `<strong>${actionName}</strong> trifft <strong>${target}</strong> für <strong>${finalDamage} ${damageType}</strong> Schaden`
         );
+
+        // GM-Whisper mit Aufschlüsselung
+        if (blockReduction > 0 || armorReduction > 0) {
+            const parts: string[] = [];
+            if (blockReduction > 0) parts.push(`${blockReduction} Block`);
+            if (armorReduction > 0) parts.push(`${armorReduction} Rüstung`);
+            const gmIds = (game.users as any)?.filter?.((u: any) => u.isGM)?.map((u: any) => u.id) ?? [];
+            await ChatMessage.create({
+                content: `<em>${actionName} → ${target}: ${rawDamage} - ${parts.join(" - ")} = ${finalDamage}</em>`,
+                whisper: gmIds,
+            });
+        }
     }
 
     static async healing(actionName: string, amount: number, target: string): Promise<void> {
@@ -60,6 +74,12 @@ export class ChatManager {
     }
 
     // Stabilitätswurf-Resultat
+    static async blockReduction(actionName: string, amount: number): Promise<void> {
+        await ChatManager.send(
+            `<strong>${actionName}</strong> reduziert Schaden um <strong>${amount}</strong>`
+        );
+    }
+
     static async dodgeRoll(actorName: string, roll: number, success: boolean): Promise<void> {
         const status = success
             ? "<strong style='color:#3a3'>✓ ausgewichen</strong>"

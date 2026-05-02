@@ -99,9 +99,11 @@ export class BattleEngine {
 
         switch (action.subtype) {
             case "damage-roll": {
-                const result = await this.performAcRoll(action.tokenId, action.targetTokenId, action.acModifier, action.name);
-                if (!result.hit) return;
-                if (result.critical) action.isCritical = true;
+                if (!action.targetTokenId) {
+                    Notifications.error("Kein Target selektiert!");
+                    return;
+                }
+                // AC-Wurf erst auf Resolve — GM kann im Stack-Dialog Vorteil/Nachteil setzen
                 break;
             }
             case "damage-fixed": {
@@ -161,9 +163,11 @@ export class BattleEngine {
 
         switch (bonusAction.subtype) {
             case "damage-roll": {
-                const result = await this.performAcRoll(bonusAction.tokenId, bonusAction.targetTokenId, bonusAction.acModifier, bonusAction.name);
-                if (!result.hit) return;
-                if (result.critical) bonusAction.isCritical = true;
+                if (!bonusAction.targetTokenId) {
+                    Notifications.error("Kein Target selektiert!");
+                    return;
+                }
+                // AC-Wurf erst auf Resolve
                 break;
             }
             case "damage-fixed": {
@@ -219,14 +223,19 @@ export class BattleEngine {
             case "interrupt":
                 break;
             case "trigger-roll": {
-                const result = await this.performAcRoll(reaction.tokenId, reaction.targetTokenId, reaction.acModifier, reaction.name);
-                if (!result.hit) return;
-                if (result.critical) reaction.isCritical = true;
+                // AC-Wurf erst auf Resolve (GM kann Vorteil/Nachteil setzen)
                 break;
             }
             case "trigger-fixed": {
                 if (!reaction.targetTokenId) {
                     Notifications.error("Kein Target selektiert!");
+                    return;
+                }
+                break;
+            }
+            case "block": {
+                if (!reaction.triggerItemId) {
+                    Notifications.error("Block ohne Trigger-Item!");
                     return;
                 }
                 break;
@@ -265,6 +274,18 @@ export class BattleEngine {
         this.persistStack();
     }
 
+    public async setRollMode(index: number, mode: "normal" | "advantage" | "disadvantage"): Promise<void> {
+        const item = this.stack[index];
+        if (!item) return;
+        if (mode === "normal") {
+            delete (item as any).rollMode;
+        } else {
+            (item as any).rollMode = mode;
+        }
+        await this.persistStack();
+        this.dialogManager.refresh("stack");
+    }
+
     public clearStack(): void {
         this.stack = [];
         this.persistStack();
@@ -290,6 +311,23 @@ export class BattleEngine {
             await ChatManager.countered(targeted.name);
         }
 
+        // Pass 1b: Block-Reaktionen — würfeln Reduction und addieren auf incomingDamageReduction
+        // des triggerItems. Trigger der schon countered sind werden übersprungen.
+        for (const item of sorted) {
+            if (item.kind !== "reaction" || item.subtype !== "block") continue;
+            if (item.status !== "pending") continue;
+            const targeted = sorted.find(i => i.id === item.triggerItemId && i.status === "pending");
+            if (!targeted) continue;
+
+            const reductionAmount = "damageFormula" in item.damageFrame
+                ? await this.rollManager.roll(item.damageFrame.damageFormula, item.tokenId)
+                : (item.damageFrame as FixedDamageFrame).resolvedAmount;
+
+            targeted.incomingDamageReduction = (targeted.incomingDamageReduction ?? 0) + reductionAmount;
+            item.status = "resolved";
+            await ChatManager.blockReduction(item.name, reductionAmount);
+        }
+
         // Pass 2 (LIFO): Damage-Resolution aller verbleibenden pending Items
         for (const item of sorted) {
             if (item.status !== "pending") continue;
@@ -307,10 +345,19 @@ export class BattleEngine {
             case "bonus-action":
                 if (item.subtype === "damage-roll" || item.subtype === "damage-fixed") {
                     if (!item.targetTokenId) return;
+
+                    // AC-Wurf bei damage-roll (mit optional Vorteil/Nachteil aus rollMode);
+                    // damage-fixed = auto-hit ohne AC-Wurf
+                    if (item.subtype === "damage-roll") {
+                        const acResult = await this.performAcRoll(item.tokenId, item.targetTokenId, item.acModifier, item.name, item.rollMode);
+                        if (!acResult.hit) return;
+                        if (acResult.critical) item.isCritical = true;
+                    }
+
                     if (item.animations) {
                         await SequencerManager.playSpellSequence(item.tokenId, item.targetTokenId, item.animations);
                     }
-                    await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, item.damageFrame, item.name, item.isCritical);
+                    await this.applyDamageFromFrame(item.tokenId, item.targetTokenId, item.damageFrame, item.name, item.isCritical, item.incomingDamageReduction);
                     // Pushes nach Damage anwenden
                     if (item.pushTarget) {
                         await pushTokenAwayFrom(item.targetTokenId, { tokenId: item.tokenId }, item.pushTarget.distance);
@@ -337,10 +384,17 @@ export class BattleEngine {
                     case "trigger-fixed": {
                         const trigger = sorted.find(i => i.id === item.triggerItemId);
                         if (!trigger) return;
+
+                        if (item.subtype === "trigger-roll") {
+                            const acResult = await this.performAcRoll(item.tokenId, trigger.tokenId, item.acModifier, item.name, item.rollMode);
+                            if (!acResult.hit) return;
+                            if (acResult.critical) item.isCritical = true;
+                        }
+
                         if (item.animations) {
                             await SequencerManager.playSpellSequence(item.tokenId, trigger.tokenId, item.animations);
                         }
-                        await this.applyDamageFromFrame(item.tokenId, trigger.tokenId, item.damageFrame, item.name, item.isCritical);
+                        await this.applyDamageFromFrame(item.tokenId, trigger.tokenId, item.damageFrame, item.name, item.isCritical, item.incomingDamageReduction);
                         break;
                     }
                     case "interrupt":
@@ -396,6 +450,7 @@ export class BattleEngine {
         damageFrame: RollableDamageFrame | FixedDamageFrame,
         name: string,
         isCritical?: boolean,
+        incomingDamageReduction?: number,
     ): Promise<void> {
         const rolledDamage = "damageFormula" in damageFrame
             ? await this.rollManager.roll(damageFrame.damageFormula, attackerTokenId)
@@ -404,10 +459,11 @@ export class BattleEngine {
         // Crit verdoppelt den finalen Damage (kein Doppelwurf, einfach * 2)
         const rawDamage = isCritical ? rolledDamage * 2 : rolledDamage;
 
-        const reduction = this.actorManager.getArmorDamageReduction(targetTokenId) ?? 0;
-        const finalDamage = Math.max(0, rawDamage - reduction);
+        const blockReduction = incomingDamageReduction ?? 0;
+        const armorReduction = this.actorManager.getArmorDamageReduction(targetTokenId) ?? 0;
+        const finalDamage = Math.max(0, rawDamage - blockReduction - armorReduction);
 
-        await ChatManager.damage(name, rawDamage, finalDamage, damageFrame.damageType, this.getTokenName(targetTokenId));
+        await ChatManager.damage(name, rawDamage, finalDamage, damageFrame.damageType, this.getTokenName(targetTokenId), blockReduction, armorReduction);
         await this.actorManager.applyDamage(targetTokenId, finalDamage);
     }
 
@@ -466,7 +522,7 @@ export class BattleEngine {
     }
 
     // Führt einen AC-Wurf durch und schickt Hit/Miss in den Chat. Gibt true bei Treffer zurück.
-    private async performAcRoll(tokenId: string, targetTokenId: string | undefined, acModifier: AttributeKey, actionName: string): Promise<{ hit: boolean; critical: boolean }> {
+    private async performAcRoll(tokenId: string, targetTokenId: string | undefined, acModifier: AttributeKey, actionName: string, rollMode?: "normal" | "advantage" | "disadvantage"): Promise<{ hit: boolean; critical: boolean }> {
         if (!targetTokenId) {
             Notifications.error("Kein Target selektiert!");
             return { hit: false, critical: false };
@@ -482,8 +538,24 @@ export class BattleEngine {
         if (modifier === null) return { hit: false, critical: false };
         const totalModifier = modifier + this.getResonanceBonus(tokenId);
 
-        const roll = await this.rollManager.roll("d20", tokenId, totalModifier);
-        const naturalRoll = roll - totalModifier;
+        // Adv/Dis: zwei D20, höchster/tiefster wird genommen. Crit-Detection prüft beide Würfel.
+        let roll: number;
+        let naturalRoll: number;
+        if (rollMode === "advantage") {
+            const r1 = await this.rollManager.roll("d20", tokenId, totalModifier);
+            const r2 = await this.rollManager.roll("d20", tokenId, totalModifier);
+            roll = Math.max(r1, r2);
+            naturalRoll = Math.max(r1 - totalModifier, r2 - totalModifier);
+        } else if (rollMode === "disadvantage") {
+            const r1 = await this.rollManager.roll("d20", tokenId, totalModifier);
+            const r2 = await this.rollManager.roll("d20", tokenId, totalModifier);
+            roll = Math.min(r1, r2);
+            naturalRoll = Math.min(r1 - totalModifier, r2 - totalModifier);
+        } else {
+            roll = await this.rollManager.roll("d20", tokenId, totalModifier);
+            naturalRoll = roll - totalModifier;
+        }
+
         const critical = naturalRoll === 20;
         const targetName = this.getTokenName(targetTokenId);
 

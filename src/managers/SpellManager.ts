@@ -136,6 +136,7 @@ export class SpellManager {
     }
 
     private static async dispatch(item: Action | BonusAction, engine: BattleEngine): Promise<void> {
+        Notifications.info(`${item.name} gewirkt`);
         if (item.kind === "bonus-action") {
             await engine.useBonusAction(item as BonusAction);
         } else {
@@ -245,6 +246,7 @@ export class SpellManager {
             resourceCosts: opts.resourceCosts,
         } as Action | BonusAction;
 
+        Notifications.info(`${item.name} gewirkt`);
         if (item.kind === "bonus-action") await ctx.engine.useBonusAction(item as BonusAction);
         else await ctx.engine.useAction(item as Action);
     }
@@ -255,7 +257,7 @@ export class SpellManager {
     // - trigger-fixed: kein AC-Wurf, Damage immer
     static async useReaction(opts: {
         name: string;
-        subtype: "counter" | "interrupt" | "trigger-roll" | "trigger-fixed" | "dodge";
+        subtype: "counter" | "interrupt" | "trigger-roll" | "trigger-fixed" | "dodge" | "block";
         damageFormula?: string;
         damageType?: DamageType;
         acModifier?: AttributeKey;
@@ -301,8 +303,15 @@ export class SpellManager {
             };
         } else if (opts.subtype === "dodge") {
             base.acModifier = opts.acModifier ?? "dex";
+        } else if (opts.subtype === "block") {
+            // damageFrame = Reduction-Amount (kein damageType-Effekt, nur als Wert)
+            base.damageFrame = {
+                damageFormula: opts.damageFormula ?? "1d6",
+                damageType: opts.damageType ?? "physical",
+            };
         }
 
+        Notifications.info(`${base.name} gewirkt`);
         await ctx.engine.useReaction(base);
     }
 
@@ -342,6 +351,7 @@ export class SpellManager {
             resourceCosts: opts.resourceCosts,
         } as Action | BonusAction;
 
+        Notifications.info(`${item.name} gewirkt`);
         if (item.kind === "bonus-action") await ctx.engine.useBonusAction(item as BonusAction);
         else await ctx.engine.useAction(item as Action);
     }
@@ -382,6 +392,7 @@ export class SpellManager {
             resourceCosts: [{ propKey: "resonance_points_amount", operator: "-", amount: reduced }],
         } as Action | BonusAction;
 
+        Notifications.info(`${item.name} gewirkt`);
         if (item.kind === "bonus-action") await ctx.engine.useBonusAction(item as BonusAction);
         else await ctx.engine.useAction(item as Action);
     }
@@ -424,6 +435,7 @@ export class SpellManager {
             resourceCosts: opts.resourceCosts,
         } as Action;
 
+        Notifications.info(`${item.name} gewirkt`);
         await ctx.engine.useAction(item);
     }
 
